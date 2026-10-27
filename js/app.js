@@ -72,8 +72,6 @@ async function coreSwap({ srcImg, dstImg, cmd = '', ui = {}, srcSel, dstSel }) {
   let rs = c.restorer ? { src: 'reg', id: c.restorer } : (ui.restorer === undefined ? { src: 'reg', id: 'gfpgan_1.4' } : ui.restorer);
   if (c.restore === false) rs = null; else if (c.restore === true && !rs) rs = { src: 'reg', id: 'gfpgan_1.4' };
   if (!(await ensure(swapGroups(sw, rs), 'Ghép mặt'))) throw new Error('Chưa có model.');
-  status('Kiểm tra an toàn ảnh…', 0.05);
-  for (const im of [srcImg, dstImg]) if ((await F.nsfwScore(im)) >= NSFW_BLOCK) throw new Error('Ảnh bị chặn: bộ lọc an toàn phát hiện nội dung nhạy cảm.');
   status('Nhận diện khuôn mặt…', 0.1);
   const sf = await F.detect(srcImg), df = await F.detect(dstImg);
   if (!sf.length) throw new Error('Không thấy khuôn mặt trong ảnh nguồn.');
@@ -87,7 +85,6 @@ async function coreSwap({ srcImg, dstImg, cmd = '', ui = {}, srcSel, dstSel }) {
     if (targets.length > 1) status(`Mặt ${k + 1}/${targets.length}…`);
     job = await F.swap(srcImg, sFace, cur, t, opts); diffs.push(F.diffOutsideMask(job).outside); cur = job.result;
   }
-  if ((await F.nsfwScore(job.result)) >= NSFW_BLOCK) throw new Error('Kết quả bị chặn bởi bộ lọc an toàn.');
   return { job, cmd: c, diffs, faces: { src: sf.length, dst: df.length }, upscale: c.upscale };
 }
 function finalOf(r) {
@@ -111,7 +108,6 @@ async function runSwap() {
 
 // ---------- TẠO ẢNH (lõi) ----------
 async function coreGen({ prompt, tier = 'fast', seed, steps, size = 512, init = null, strength = 0.55, style = null }) {
-  const c0 = checkPrompt(prompt); if (!c0.ok) throw new Error(c0.reason);
   const sup = G.tierSupported(tier); if (!sup.ok) throw new Error(sup.why);
   const T = G.TIERS[tier]; const groups = [[T.group, init ? T.ids : T.ids.slice(0, 3)]];
   if (hasVietnamese(prompt) && !(await S.isCached('mt', ['encoder', 'decoder']))) groups.push(['mt', ['encoder', 'decoder']]);
@@ -119,10 +115,8 @@ async function coreGen({ prompt, tier = 'fast', seed, steps, size = 512, init = 
   if (!(await ensure(groups, T.label))) throw new Error('Chưa có model.');
   status('Dịch prompt…', 0.05);
   const tr = await translate(prompt);
-  const c1 = checkPrompt(tr.text); if (!c1.ok) throw new Error(c1.reason);
   const en = [tr.text.replace(/[.。!?\s]+$/, ''), style && STYLE_CHIPS[style]].filter(Boolean).join(', ');
   const out = await G.generate({ tier, prompt: en, seed, steps, size, init, strength, onStep: (m, p) => status(m, 0.1 + p * 0.85), onProgress: (d, t) => status(`Đang tải model… ${MB(d)} / ${MB(t)}`, d / t) });
-  if ((await F.nsfwScore(out)) >= NSFW_BLOCK) throw new Error('Kết quả bị chặn bởi bộ lọc an toàn. Hãy đổi prompt hoặc seed.');
   out.meta.en = en; out.meta.how = tr.how; return out;
 }
 async function runGen() {
