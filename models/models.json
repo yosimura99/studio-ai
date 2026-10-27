@@ -1,0 +1,243 @@
+{
+ "face": {
+  "det": {
+   "id": "det",
+   "path": "models/det/",
+   "chunks": [
+    "w.000"
+   ],
+   "size16": 8452128,
+   "size32": 16903680,
+   "g16": 40293,
+   "g32": 31632,
+   "bytes": 8486755
+  },
+  "arcface": {
+   "id": "arcface",
+   "path": "models/arcface/",
+   "chunks": [
+    "w.000",
+    "w.001"
+   ],
+   "size16": 87181952,
+   "size32": 174363904,
+   "g16": 36909,
+   "g32": 37565,
+   "bytes": 87226258
+  },
+  "inswapper": {
+   "id": "inswapper",
+   "path": "models/inswapper/",
+   "chunks": [
+    "w.000",
+    "w.001",
+    "w.002",
+    "w.003",
+    "w.004",
+    "w.005"
+   ],
+   "size16": 276585472,
+   "size32": 553170944,
+   "g16": 41394,
+   "g32": 41546,
+   "bytes": 277677783,
+   "extra": [
+    "emap.bin"
+   ]
+  },
+  "gfpgan": {
+   "id": "gfpgan",
+   "path": "models/gfpgan/",
+   "chunks": [
+    "w.000",
+    "w.001",
+    "w.002",
+    "w.003"
+   ],
+   "size16": 170067200,
+   "size32": 340134400,
+   "g16": 206803,
+   "g32": 207905,
+   "bytes": 170282727
+  },
+  "bisenet": {
+   "id": "bisenet",
+   "path": "models/bisenet/",
+   "chunks": [
+    "w.000"
+   ],
+   "size16": 46797056,
+   "size32": 93594112,
+   "g16": 60239,
+   "g32": 60482,
+   "bytes": 46860565
+  },
+  "nsfw": {
+   "id": "nsfw",
+   "path": "models/nsfw/",
+   "chunks": [
+    "w.000"
+   ],
+   "size16": 11782528,
+   "size32": 23565056,
+   "g16": 39061,
+   "g32": 39365,
+   "bytes": 11825157
+  }
+ },
+ "t2i": {
+  "text_encoder": {
+   "id": "text_encoder",
+   "path": "models/text_encoder/",
+   "chunks": [
+    "w.000",
+    "w.001",
+    "w.002",
+    "w.003",
+    "w.004",
+    "w.005"
+   ],
+   "size16": 246120960,
+   "size32": 492241920,
+   "g16": 190651,
+   "g32": 191369,
+   "bytes": 246318920
+  },
+  "unet": {
+   "id": "unet",
+   "path": "models/unet/",
+   "chunks": [
+    "w.000",
+    "w.001",
+    "w.002",
+    "w.003",
+    "w.004",
+    "w.005",
+    "w.006",
+    "w.007",
+    "w.008",
+    "w.009",
+    "w.010",
+    "w.011",
+    "w.012",
+    "w.013"
+   ],
+   "size16": 631492480,
+   "size32": 1262984960,
+   "g16": 488170,
+   "g32": 492712,
+   "bytes": 631994629
+  },
+  "vae_decoder": {
+   "id": "vae_decoder",
+   "path": "models/vae_decoder/",
+   "chunks": [
+    "w.000"
+   ],
+   "size16": 2445056,
+   "size32": 4890112,
+   "g16": 35707,
+   "g32": 35925,
+   "bytes": 2482882
+  },
+  "vae_encoder": {
+   "id": "vae_encoder",
+   "path": "models/vae_encoder/",
+   "chunks": [
+    "w.000"
+   ],
+   "size16": 2445056,
+   "size32": 4890112,
+   "g16": 30965,
+   "g32": 31158,
+   "bytes": 2478116
+  }
+ },
+ "hq": {
+  "hq_unet": {
+   "id": "hq_unet",
+   "type": "raw",
+   "parts": [
+    "studio-ai-hq1/unet/m.000",
+    "studio-ai-hq1/unet/m.001",
+    "studio-ai-hq1/unet/m.002",
+    "studio-ai-hq1/unet/m.003",
+    "studio-ai-hq1/unet/m.004",
+    "studio-ai-hq1/unet/m.005",
+    "studio-ai-hq1/unet/m.006",
+    "studio-ai-hq1/unet/m.007",
+    "studio-ai-hq1/unet/m.008",
+    "studio-ai-hq1/unet/m.009",
+    "studio-ai-hq1/unet/m.010",
+    "studio-ai-hq1/unet/m.011",
+    "studio-ai-hq1/unet/m.012",
+    "studio-ai-hq1/unet/m.013",
+    "studio-ai-hq1/unet/m.014",
+    "studio-ai-hq1/unet/m.015",
+    "studio-ai-hq1/unet/m.016",
+    "studio-ai-hq1/unet/m.017",
+    "studio-ai-hq1/unet/m.018",
+    "studio-ai-hq1/unet/m.019",
+    "studio-ai-hq2/unet/m.020",
+    "studio-ai-hq2/unet/m.021",
+    "studio-ai-hq2/unet/m.022",
+    "studio-ai-hq2/unet/m.023",
+    "studio-ai-hq2/unet/m.024",
+    "studio-ai-hq2/unet/m.025",
+    "studio-ai-hq2/unet/m.026",
+    "studio-ai-hq2/unet/m.027",
+    "studio-ai-hq2/unet/m.028",
+    "studio-ai-hq2/unet/m.029",
+    "studio-ai-hq2/unet/m.030",
+    "studio-ai-hq2/unet/m.031",
+    "studio-ai-hq2/unet/m.032",
+    "studio-ai-hq2/unet/m.033",
+    "studio-ai-hq2/unet/m.034",
+    "studio-ai-hq2/unet/m.035",
+    "studio-ai-hq2/unet/m.036"
+   ],
+   "bytes": 1733430199
+  },
+  "hq_vae_decoder": {
+   "id": "hq_vae_decoder",
+   "type": "raw",
+   "parts": [
+    "studio-ai-hq2/vae_decoder/m.000",
+    "studio-ai-hq2/vae_decoder/m.001",
+    "studio-ai-hq2/vae_decoder/m.002"
+   ],
+   "bytes": 99094314
+  },
+  "hq_text_encoder": {
+   "id": "hq_text_encoder",
+   "type": "raw",
+   "parts": [
+    "studio-ai-hq3/text_encoder/m.000",
+    "studio-ai-hq3/text_encoder/m.001",
+    "studio-ai-hq3/text_encoder/m.002",
+    "studio-ai-hq3/text_encoder/m.003",
+    "studio-ai-hq3/text_encoder/m.004",
+    "studio-ai-hq3/text_encoder/m.005",
+    "studio-ai-hq3/text_encoder/m.006",
+    "studio-ai-hq3/text_encoder/m.007",
+    "studio-ai-hq3/text_encoder/m.008",
+    "studio-ai-hq3/text_encoder/m.009",
+    "studio-ai-hq3/text_encoder/m.010",
+    "studio-ai-hq3/text_encoder/m.011",
+    "studio-ai-hq3/text_encoder/m.012",
+    "studio-ai-hq3/text_encoder/m.013",
+    "studio-ai-hq3/text_encoder/m.014"
+   ],
+   "bytes": 681393168
+  },
+  "hq_vae_encoder": {
+   "id": "hq_vae_encoder",
+   "type": "raw",
+   "parts": [
+    "studio-ai-hq3/vae_encoder/m.000",
+    "studio-ai-hq3/vae_encoder/m.001"
+   ],
+   "bytes": 68430468
+  }
+ }
+}
