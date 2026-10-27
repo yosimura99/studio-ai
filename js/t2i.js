@@ -4,8 +4,9 @@ import { loadTok, encode } from './clip_tok.js';
 import { canvas, ctx2d } from './img.js';
 
 export const TIERS = {
-  fast: { label: 'Nhanh (SDXS-512)', group: 't2i', ids: ['text_encoder', 'unet', 'vae_decoder', 'vae_encoder'], license: 'openrail++ (IDKiro/sdxs-512-dreamshaper)' },
-  hq: { label: 'Chất lượng cao (SD-Turbo)', group: 'hq', ids: ['hq_text_encoder', 'hq_unet', 'hq_vae_decoder', 'hq_vae_encoder'], license: 'Stability AI Community License (stabilityai/sd-turbo)' },
+  // SDXS-512-0.9 (gốc SD2/OpenCLIP): ra ảnh giống ảnh chụp hơn bản DreamShaper (bản cũ ra kiểu tranh/CG). Chỉ có bản int8.
+  fast: { label: 'Nhanh (SDXS-512 · ảnh thật)', group: 't2i', ids: ['te09', 'unet09', 'vae_decoder', 'vae_encoder'], pad: 0, license: 'openrail++ (IDKiro/sdxs-512-0.9)', cfg: 0 },
+  hq: { label: 'Chất lượng cao (SD-Turbo)', group: 'hq', ids: ['hq_text_encoder', 'hq_unet', 'hq_vae_decoder', 'hq_vae_encoder'], license: 'Stability AI Community License (stabilityai/sd-turbo)', cfg: 0 },
 };
 const ACP = (() => { const a = new Float64Array(1000); let c = 1; for (let i = 0; i < 1000; i++) { const b = (Math.sqrt(0.00085) + (Math.sqrt(0.012) - Math.sqrt(0.00085)) * i / 999) ** 2; c *= 1 - b; a[i] = c; } return a; })();
 function rng(seed) { let s = seed >>> 0; const u = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -25,7 +26,18 @@ export function tierSupported(tier) {
   return { ok: true };
 }
 
-/** opts: {tier, prompt, negative, seed, steps, size, init (canvas), strength, onStep} → canvas */
+// Ảnh chụp thật (mặc định). Đặt chủ thể trước (CLIP chỉ đọc 77 token), hậu tố ảnh chụp sau.
+export const PHOTO_PRE = 'a photo of ';
+export const PHOTO_SUFFIX = 'realistic photo, natural lighting, shot on 35mm camera, detailed skin texture, sharp focus, photograph';
+// Chỉ dùng khi model có CFG (guidance > 1). SDXS-512 (1 bước) và SD-Turbo chạy guidance 0 → bỏ qua.
+export const PHOTO_NEG = 'drawing, painting, illustration, anime, cartoon, 3d render, cgi, sketch, plastic skin, blurry, deformed';
+export function photoPrompt(en) {
+  const sfx = (typeof window !== 'undefined' && window.__photoSuffix != null) ? window.__photoSuffix : PHOTO_SUFFIX;
+  const pre = (typeof window !== 'undefined' && window.__photoPre != null) ? window.__photoPre : PHOTO_PRE;
+  const body = /^(a |an )?(photo|photograph|picture)\b/i.test(en) ? en : pre + en;
+  return sfx ? body + ', ' + sfx : body;
+}
+/** opts: {tier, prompt, negative (chỉ khi TIERS[tier].cfg > 1), seed, steps, size, init (canvas), strength, onStep} → canvas */
 export async function generate(o) {
   const tier = o.tier || 'fast'; const T = TIERS[tier]; const step = (m, p) => o.onStep?.(m, p);
   const chk = () => { if (o.signal?.aborted) throw new DOMException('Đã huỷ', 'AbortError'); };
@@ -41,7 +53,7 @@ export async function generate(o) {
   const times = {}; const t0 = performance.now(); const tm = (k, a) => times[k] = Math.round(performance.now() - a);
   // 1) mã hoá chữ
   const tok = await loadTok(S.APP_BASE + 'models/tok/');
-  const ids = encode(tok, o.prompt || '', tier === 'hq' ? 0 : 49407);
+  const ids = encode(tok, o.prompt || '', T.pad ?? (tier === 'hq' ? 0 : 49407));
   let a = performance.now();
   const teIn = tier === 'hq' ? { type: 'int32', data: Int32Array.from(ids), dims: [1, 77] } : { type: 'int64', data: BigInt64Array.from(ids.map(BigInt)), dims: [1, 77] };
   const h = await run1(T.ids[0], [teIn], 'Nạp model 1/3…', 0.05); const hidden = { type: h.type, data: h.data, dims: h.dims }; tm('text', a);

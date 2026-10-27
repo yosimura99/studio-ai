@@ -147,6 +147,77 @@
    "g32": 31158,
    "bytes": 2478116,
    "gc": true
+  },
+  "te09": {
+   "id": "te09",
+   "qonly": true,
+   "path": "t2i09/te09/",
+   "chunks": [],
+   "bytes": 342499710,
+   "q": {
+    "chunks": [
+     "studio-ai/t2i09/te09/q.000",
+     "studio-ai/t2i09/te09/q.001",
+     "studio-ai/t2i09/te09/q.002",
+     "studio-ai/t2i09/te09/q.003",
+     "studio-ai/t2i09/te09/q.004",
+     "studio-ai/t2i09/te09/q.005",
+     "studio-ai/t2i09/te09/q.006",
+     "studio-ai/t2i09/te09/q.007",
+     "studio-ai/t2i09/te09/q.008",
+     "studio-ai/t2i09/te09/q.009",
+     "studio-ai/t2i09/te09/q.010",
+     "studio-ai/t2i09/te09/q.011",
+     "studio-ai/t2i09/te09/q.012",
+     "studio-ai-hq3/t2i09/te09/q.013",
+     "studio-ai-hq3/t2i09/te09/q.014",
+     "studio-ai-hq3/t2i09/te09/q.015",
+     "studio-ai-hq3/t2i09/te09/q.016",
+     "studio-ai-hq3/t2i09/te09/q.017",
+     "studio-ai-hq3/t2i09/te09/q.018",
+     "studio-ai-hq3/t2i09/te09/q.019",
+     "studio-ai-hq3/t2i09/te09/q.020",
+     "studio-ai-hq3/t2i09/te09/q.021"
+    ],
+    "gq": "studio-ai-hq3/t2i09/te09/gq.onnx",
+    "size": 340696064,
+    "bytes": 342499710
+   }
+  },
+  "unet09": {
+   "id": "unet09",
+   "qonly": true,
+   "path": "t2i09/unet09/",
+   "chunks": [],
+   "bytes": 329971879,
+   "q": {
+    "chunks": [
+     "studio-ai-hq3/t2i09/unet09/q.000",
+     "studio-ai-hq3/t2i09/unet09/q.001",
+     "studio-ai-hq3/t2i09/unet09/q.002",
+     "studio-ai-hq3/t2i09/unet09/q.003",
+     "studio-ai-t2i/t2i09/unet09/q.004",
+     "studio-ai-t2i/t2i09/unet09/q.005",
+     "studio-ai-t2i/t2i09/unet09/q.006",
+     "studio-ai-t2i/t2i09/unet09/q.007",
+     "studio-ai-t2i/t2i09/unet09/q.008",
+     "studio-ai-hq2/t2i09/unet09/q.009",
+     "studio-ai-hq2/t2i09/unet09/q.010",
+     "studio-ai-hq2/t2i09/unet09/q.011",
+     "studio-ai-hq2/t2i09/unet09/q.012",
+     "studio-ai-hq2/t2i09/unet09/q.013",
+     "studio-ai-m3/t2i09/unet09/q.014",
+     "studio-ai-m3/t2i09/unet09/q.015",
+     "studio-ai-m3/t2i09/unet09/q.016",
+     "studio-ai-m3/t2i09/unet09/q.017",
+     "studio-ai-m4/t2i09/unet09/q.018",
+     "studio-ai-m4/t2i09/unet09/q.019",
+     "studio-ai-m4/t2i09/unet09/q.020"
+    ],
+    "gq": "studio-ai-hq3/t2i09/unet09/gq.onnx",
+    "size": 328385280,
+    "bytes": 329971879
+   }
   }
  },
  "hq": {

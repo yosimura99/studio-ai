@@ -67,11 +67,12 @@ async function fetchWithProgress(url, onBytes, signal) {
 }
 function urls(group, m) {
   if (isRaw(m)) { const parts = m.parts.map(p => ROOT + p); return { chunks: parts, wchunks: parts, all: parts }; }
-  const b = (m.root ? ROOT : baseOf(group)) + m.path; const qb = m.q && m.q.root ? ROOT + m.q.root : b; return { gq: m.q ? qb + 'gq.onnx' : null, qchunks: m.q ? m.q.chunks.map(c => qb + c) : [], chunks: [...m.chunks, ...(m.extra || [])].map(c => b + c), g16: m.no16 ? null : b + 'g16.onnx', g32: b + 'g32.onnx', gc: m.gc ? b + 'gc.onnx' : null, segs: b + 'segs.json', wchunks: m.chunks.map(c => b + c), all: null }; }
+  const b = (m.root ? ROOT : baseOf(group)) + m.path; const qb = m.q && m.q.root ? ROOT + m.q.root : b; const qu = (c) => c.includes('/') ? ROOT + c : qb + c; const wc = m.chunks || []; return { gq: m.q ? (m.q.gq ? ROOT + m.q.gq : qb + 'gq.onnx') : null, qchunks: m.q ? m.q.chunks.map(qu) : [], chunks: [...wc, ...(m.extra || [])].map(c => b + c), g16: m.no16 ? null : b + 'g16.onnx', g32: b + 'g32.onnx', gc: m.gc ? b + 'gc.onnx' : null, segs: b + 'segs.json', wchunks: wc.map(c => b + c), all: null }; }
 // gc.onnx = đồ thị fp32 nhưng trọng số giữ fp16 (+ Cast khi chạy): RAM bằng 1/2 so với g32. Dùng trên WASM khi máy ít RAM.
 const useGc = (m) => !!m.gc && (lowMem || FORCE_GC);
 // gq.onnx + q.NNN = trọng số int8 theo kênh (DequantizeLinear khi chạy): RAM bằng 1/4 fp32. Ưu tiên trên iPhone.
-const useQ = (m) => !!m.q && (lowMem || FORCE_GC);
+// qonly: model chỉ có bản int8 (chunk có thể nằm ở nhiều repo: 'repo/đường/dẫn' tính từ ROOT)
+const useQ = (m) => !!m.q && (m.qonly || lowMem || FORCE_GC);
 export const sizeOf = (m) => useQ(m) ? m.q.bytes : m.bytes;
 const FORCE_GC = (() => { try { return !!self.__lite || /[?&]lite=1/.test(location.search) || localStorage.getItem('studioai.lite') === '1'; } catch { return !!self.__lite; } })();
 const need = (u, m) => u.all || (useQ(m) ? [u.gq, ...u.qchunks] : [u.segs, ...(useGc(m) ? [u.gc] : [u.g32, u.g16]), ...u.chunks]).filter(Boolean);
@@ -146,7 +147,7 @@ export async function session(group, id, onProgress, signal) {
     }
     const use16 = backend === 'webgpu' && hasF16 && !m.no16;
     const segsOf = async () => JSON.parse(new TextDecoder().decode(await cachedBytes(u.segs)));
-    if (!use16 && useQ(m)) {
+    if ((m.qonly || !use16) && useQ(m)) {
       let w = await readInto(u.qchunks, m.q.size); const graph = await cachedBytes(u.gq);
       try { return await ort.InferenceSession.create(graph, lean({ logSeverityLevel: 3, executionProviders: ['wasm'], externalData: [{ path: 'q.bin', data: w }], graphOptimizationLevel: 'disabled' })); }
       finally { w = null; self.gc?.(); }

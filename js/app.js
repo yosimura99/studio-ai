@@ -4,13 +4,13 @@ import * as F from './face.js';
 import * as G from './t2i.js';
 import { loadImage, canvas, ctx2d } from './img.js';
 import { findEmap } from './onnxscan.js';
-import { parseCommand, SWAP_CHIPS, STYLE_CHIPS } from './cmd.js';
+import { parseCommand, SWAP_CHIPS } from './cmd.js';
 import { translate, hasVietnamese } from './translate.js';
 import { checkPrompt, NSFW_BLOCK, CONSENT } from './safety.js';
 
 const $ = (s) => document.querySelector(s); const $$ = (s) => [...document.querySelectorAll(s)];
 const MB = (b) => b >= 1e9 ? (b / 1e9).toFixed(2).replace('.', ',') + ' GB' : Math.round(b / 1e6) + ' MB';
-const st = { tab: 'swap', src: {}, dst: {}, init: {}, view: null, hist: [], brush: 0, auto: false, busy: false, style: null };
+const st = { tab: 'swap', src: {}, dst: {}, init: {}, view: null, hist: [], brush: 0, auto: false, busy: false };
 let REG;
 
 // ---------- trạng thái ----------
@@ -117,7 +117,7 @@ function upTo(src, L) {
     for (let ch = 0; ch < 3; ch++) { const j = i + ch; const bl = (o[j - 4] + o[j + 4] + o[j - w * 4] + o[j + w * 4]) / 4; d[j] = o[j] + a * (o[j] - bl); } }
   g.putImageData(im, 0, 0); return c;
 }
-async function coreGen({ prompt, tier = 'fast', seed, steps, size = 512, init = null, strength = 0.55, style = null }) {
+async function coreGen({ prompt, tier = 'fast', seed, steps, size = 512, init = null, strength = 0.55 }) {
   const sup = G.tierSupported(tier); if (!sup.ok) throw new Error(sup.why);
   const T = G.TIERS[tier]; const groups = [[T.group, init ? T.ids : T.ids.slice(0, 3)]];
   if (hasVietnamese(prompt) && !(await S.isCached('mt', ['encoder', 'decoder']))) groups.push(['mt', ['encoder', 'decoder']]);
@@ -125,8 +125,10 @@ async function coreGen({ prompt, tier = 'fast', seed, steps, size = 512, init = 
   if (!(await ensure(groups, T.label))) throw new Error('Chưa có model.');
   status('Dịch prompt…', 0.05);
   const tr = await translate(prompt);
-  const en = [tr.text.replace(/[.。!?\s]+$/, ''), style && STYLE_CHIPS[style]].filter(Boolean).join(', ');
-  const out0 = await G.generate({ tier, prompt: en, seed, steps, size, init, strength, signal: st.ac?.signal, onStep: (m, p) => status(m, 0.1 + p * 0.85), onProgress: (d, t) => status(`Đang tải model… ${MB(d)} / ${MB(t)}`, d / t) });
+  const en = tr.text.replace(/[.。!?\s]+$/, '');
+  // mặc định: ảnh chụp thật — hậu tố ẩn (SDXS/SD-Turbo chạy guidance 0 nên không có negative prompt thật, phải dựa vào hậu tố)
+  const full = G.photoPrompt(en);
+  const out0 = await G.generate({ tier, prompt: full, negative: G.PHOTO_NEG, seed, steps, size, init, strength, signal: st.ac?.signal, onStep: (m, p) => status(m, 0.1 + p * 0.85), onProgress: (d, t) => status(`Đang tải model… ${MB(d)} / ${MB(t)}`, d / t) });
   const out = upTo(out0, S.isMobile || S.lowMem ? 720 : 0); out.meta = out0.meta;
   out.meta.en = en; out.meta.how = tr.how; return out;
 }
@@ -135,7 +137,7 @@ async function runGen() {
   const prompt = $('#genPrompt').value.trim(); if (!prompt) return status('Hãy nhập prompt.', null, true);
   const tier = $('input[name=tier]:checked').value; const sv = $('#seed').value;
   await busy(async () => {
-    const out = await coreGen({ prompt, tier, seed: sv === '' ? undefined : +sv, steps: +$('#steps').value, size: +$('#size').value, init: i2i ? st.init.img : null, strength: $('#strength').value / 100, style: st.style });
+    const out = await coreGen({ prompt, tier, seed: sv === '' ? undefined : +sv, steps: +$('#steps').value, size: +$('#size').value, init: i2i ? st.init.img : null, strength: $('#strength').value / 100 });
     $('#trEcho').textContent = out.meta.how === 'none' ? '' : `Dịch (${out.meta.how === 'opus' ? 'opus-mt' : 'từ điển'}): ${out.meta.en}`;
     let before = null; if (i2i) { before = canvas(out.width, out.height); const s = Math.min(st.init.img.width, st.init.img.height); ctx2d(before).drawImage(st.init.img, (st.init.img.width - s) / 2, (st.init.img.height - s) / 2, s, s, 0, 0, out.width, out.height); }
     const m = out.meta; show(out, before, `${G.TIERS[m.tier].label} · seed ${m.seed} · ${m.steps} bước · ${m.size}px · ${m.times.total ?? ''} ms`, null); addHist();
@@ -214,7 +216,7 @@ const BUNDLES = () => [
   { name: 'Lõi ghép mặt (nhận diện, ArcFace, BiSeNet, lọc an toàn)', g: [['face', F.FACE_MODELS]], lic: 'InsightFace (phi thương mại) · BiSeNet MIT · open_nsfw BSD-2' },
   ...Object.entries(REG.swap).map(([id, m]) => ({ name: 'Ghép: ' + m.label, g: [['swap', [id]], ...(m.needs ? [['conv', m.needs]] : [])], lic: m.license })),
   ...Object.entries(REG.restore).map(([id, m]) => ({ name: 'Làm nét: ' + m.label, g: [['restore', [id]]], lic: m.license })),
-  { name: 'Tạo ảnh — Nhanh (SDXS-512, có img2img)', g: [['t2i', G.TIERS.fast.ids]], lic: G.TIERS.fast.license },
+  { name: 'Tạo ảnh — Nhanh (SDXS-512 ảnh thật, có img2img)', g: [['t2i', G.TIERS.fast.ids]], lic: G.TIERS.fast.license },
   { name: 'Tạo ảnh — Chất lượng cao (SD-Turbo, cần WebGPU)', g: [['hq', G.TIERS.hq.ids]], lic: G.TIERS.hq.license },
   { name: 'Dịch Việt → Anh (opus-mt-vi-en)', g: [['mt', ['encoder', 'decoder']]], lic: REG.mt.encoder.license },
 ];
@@ -312,14 +314,13 @@ async function tierUI() {
   const fb = await G.tierBytes('fast'), hb = await G.tierBytes('hq');
   const hqOk = !S.isIOS || (navigator.gpu && localStorage.getItem('studioai.gpu') === '1');
   $('#tierHq').closest('label').hidden = !hqOk;   // iPhone: ẩn Chất lượng cao (2,6 GB, chắc chắn văng)
-  $('#tierFast').textContent = S.lowMem ? `SDXS-512 (int8) · 1 bước · tải ${MB(fb)} · dùng ~1,2 GB RAM` : `SDXS-512 · 1 bước · ${MB(fb)} · chạy cả iPhone`; $('#tierHq').textContent = `SD-Turbo · 1–8 bước · ${MB(hb)} · cần WebGPU`;
+  $('#tierFast').textContent = S.lowMem ? `SDXS-512 ảnh thật (int8) · 1 bước · tải ${MB(fb)} · dùng ~1,2 GB RAM` : `SDXS-512 ảnh thật · 1 bước · ${MB(fb)} · chạy cả iPhone`; $('#tierHq').textContent = `SD-Turbo · 1–8 bước · ${MB(hb)} · cần WebGPU`;
 }
 async function init() {
   const qs = new URLSearchParams(location.search); st.auto = qs.get('auto') === '1';
   REG = await S.registry();
   $('#consentNote').textContent = CONSENT;
   chips('#swapChips', SWAP_CHIPS, (t) => { const a = $('#swapCmd'); a.value = (a.value.trim() ? a.value.trim().replace(/[,.]$/, '') + ', ' : '') + t.toLowerCase(); echoCmd(); });
-  chips('#styleChips', Object.keys(STYLE_CHIPS), (t, c) => { st.style = st.style === t ? null : t; $$('#styleChips .chip').forEach(x => x.classList.toggle('on', x.textContent === st.style)); });
   const echoCmd = () => { const n = parseCommand($('#swapCmd').value).notes; $('#cmdEcho').textContent = n.length ? 'Hiểu là: ' + n.join(' · ') : ''; };
   $('#swapCmd').oninput = echoCmd;
   $$('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
