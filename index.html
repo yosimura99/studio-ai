@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Studio AI · Studio Của Khang</title>
+<meta name="description" content="Ghép mặt AI và tạo ảnh từ chữ chạy hoàn toàn trên máy – không cần mạng sau khi tải model, không gửi ảnh đi đâu.">
+<meta name="theme-color" content="#16151b">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Studio AI">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+<!-- Khóa PIN dùng chung với Studio Của Khang (cùng data-ns) -->
+<script src="js/lock.js" data-ns="studio" data-title="Studio Của Khang" data-icon="icons/icon-192.png"></script>
+</head>
+<body>
+<header class="top">
+  <a class="back" id="back" href="../studio/" title="Về Studio">‹ Studio</a>
+  <div class="brand"><img src="icons/icon.svg" alt="" width="26" height="26"><h1>Studio AI</h1></div>
+  <span class="badge" id="backend">…</span>
+  <a class="help" href="docs.html">Hướng dẫn</a>
+</header>
+<div class="shell">
+  <nav class="side" role="tablist">
+    <button class="tab on" data-tab="swap" role="tab"><span>🙂</span>Ghép mặt</button>
+    <button class="tab" data-tab="t2i" role="tab"><span>✨</span>Tạo từ prompt</button>
+    <button class="tab" data-tab="i2i" role="tab"><span>🖼️</span>Tạo từ ảnh</button>
+    <button class="tab" data-tab="models" role="tab"><span>📦</span>Model</button>
+  </nav>
+
+  <main class="work">
+    <section class="left">
+      <!-- GHÉP MẶT -->
+      <div class="pane" id="pane-swap">
+        <div class="slots">
+          <label class="slot" id="slotSrc"><input type="file" accept="image/*" hidden><div class="ph"><b>＋</b>Ảnh mặt nguồn<small>(khuôn mặt muốn dùng)</small></div><img alt="" hidden></label>
+          <label class="slot" id="slotDst"><input type="file" accept="image/*" hidden><div class="ph"><b>＋</b>Ảnh đích<small>(ảnh sẽ được thay mặt)</small></div><img alt="" hidden></label>
+        </div>
+        <div class="faces" id="facesSrc"></div>
+        <div class="faces" id="facesDst"></div>
+        <div class="row2">
+          <label>Model ghép<select id="selSwap"></select></label>
+          <label>Làm nét<select id="selRestore"></select></label>
+        </div>
+        <button class="ghost-btn" id="btnAddModel">＋ Tải model</button>
+        <p class="hint" id="modelInfo"></p>
+        <label class="lbl">Lệnh (tiếng Việt)</label>
+        <textarea id="swapCmd" rows="2" placeholder="VD: ghép vào mặt thứ 2, giữ miệng, làm nét mạnh"></textarea>
+        <div class="chips" id="swapChips"></div>
+        <p class="hint" id="cmdEcho"></p>
+        <div class="toggles">
+          <label class="sw"><input type="checkbox" id="optLock" checked><i></i>Khoá vùng mặt (giữ tóc, tai, nền)</label>
+          <label class="sw"><input type="checkbox" id="optMouth"><i></i>Giữ miệng gốc</label>
+          <label class="sw"><input type="checkbox" id="optColor" checked><i></i>Khớp màu da</label>
+        </div>
+        <label class="lbl">Độ làm nét <output id="restoreAmtV">80%</output></label>
+        <input type="range" id="restoreAmt" min="0" max="100" value="80">
+        <div class="brushbar">
+          <span class="lbl">Cọ mặt nạ</span>
+          <button class="seg" data-brush="1">＋ Thêm</button><button class="seg" data-brush="-1">－ Xoá</button><button class="seg" data-brush="0">Tắt</button>
+          <button class="seg" id="brushReset">Đặt lại</button>
+          <input type="range" id="brushSize" min="4" max="120" value="28" title="Cỡ cọ">
+          <label class="sw small"><input type="checkbox" id="showMask"><i></i>Hiện mặt nạ</label>
+        </div>
+        <label class="consent"><input type="checkbox" id="consent"> Tôi có quyền dùng các ảnh này (ảnh của tôi hoặc người đã đồng ý).</label>
+        <button class="run" id="runSwap">Chạy</button>
+      </div>
+
+      <!-- TẠO TỪ PROMPT / TỪ ẢNH (dùng chung) -->
+      <div class="pane" id="pane-gen" hidden>
+        <label class="slot wide" id="slotInit" hidden><input type="file" accept="image/*" hidden><div class="ph"><b>＋</b>Ảnh gốc<small>(AI sẽ vẽ lại theo prompt)</small></div><img alt="" hidden></label>
+        <div class="tiers" id="tiers">
+          <label class="tier"><input type="radio" name="tier" value="fast" checked><div><b>Nhanh</b><small id="tierFast">SDXS-512 · 1 bước</small></div></label>
+          <label class="tier"><input type="radio" name="tier" value="hq"><div><b>Chất lượng cao</b><small id="tierHq">SD-Turbo · cần WebGPU</small></div></label>
+        </div>
+        <p class="warn" id="tierWarn" hidden></p>
+        <label class="lbl">Prompt (tiếng Việt hoặc tiếng Anh)</label>
+        <textarea id="genPrompt" rows="3" placeholder="VD: một con cáo đỏ trong rừng tuyết, ánh hoàng hôn"></textarea>
+        <div class="chips" id="styleChips"></div>
+        <p class="hint" id="trEcho"></p>
+        <div class="row3">
+          <label>Seed<div class="seed"><input id="seed" type="number" min="0" placeholder="ngẫu nhiên"><button id="dice" title="Seed ngẫu nhiên">🎲</button></div></label>
+          <label>Kích thước<select id="size"><option>256</option><option>384</option><option selected>512</option><option>640</option><option>768</option></select></label>
+          <label id="stepsL">Số bước <output id="stepsV">2</output><input type="range" id="steps" min="1" max="8" value="2"></label>
+        </div>
+        <div id="strengthL" hidden><label class="lbl">Mức thay đổi <output id="strengthV">55%</output></label><input type="range" id="strength" min="10" max="100" value="55"></div>
+        <button class="run" id="runGen">Chạy</button>
+      </div>
+
+      <!-- MODEL -->
+      <div class="pane" id="pane-models" hidden>
+        <p class="hint" id="usage"></p>
+        <button class="ghost-btn" id="btnAddModel2">＋ Tải model của bạn (.onnx / thư mục / link)</button>
+        <h3>Model của bạn</h3><div id="customList" class="mlist"></div>
+        <h3>Model có sẵn (tải khi cần)</h3><div id="regList" class="mlist"></div>
+      </div>
+      <div class="status" id="status" hidden><div class="bar"><i id="bar"></i></div><span id="statusText"></span></div>
+      <p class="note" id="consentNote"></p>
+    </section>
+
+    <section class="right">
+      <div class="viewer" id="viewer">
+        <div class="empty" id="vEmpty">Kết quả sẽ hiện ở đây</div>
+        <div class="stage" id="stage" hidden>
+          <canvas id="vAfter"></canvas>
+          <div class="beforeWrap" id="beforeWrap"><canvas id="vBefore"></canvas></div>
+          <canvas id="vMask"></canvas>
+          <div class="handle" id="handle"></div>
+        </div>
+      </div>
+      <div class="vbar">
+        <label class="cmp" id="cmpL">Trước / sau<input type="range" id="cmp" min="0" max="100" value="50"></label>
+        <span class="meta" id="vMeta"></span>
+        <button class="ghost-btn sm" id="dlOne" disabled>Tải ảnh</button>
+      </div>
+      <div class="hist">
+        <div class="hhead"><b>Lịch sử</b><span><button class="ghost-btn sm" id="histDl">Tải tất cả</button><button class="ghost-btn sm" id="histClr">Xoá hết</button></span></div>
+        <div class="strip" id="strip"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlgModel">
+  <form method="dialog" class="dlg">
+    <h3>Tải model của bạn</h3>
+    <p class="hint">Hỗ trợ model ghép mặt (inswapper, hyperswap, simswap, ghost, uniface…) và model làm nét (GFPGAN, CodeFormer, GPEN, RestoreFormer) dạng <b>.onnx</b>. Không hỗ trợ model khiêu dâm/không kiểm duyệt.</p>
+    <div class="segs"><button type="button" class="seg on" data-src="file">File .onnx</button><button type="button" class="seg" data-src="dir">Thư mục</button><button type="button" class="seg" data-src="url">Link</button></div>
+    <div data-pane="file"><input type="file" id="mFile" accept=".onnx,.data,.json,application/octet-stream" multiple><p class="hint">iPhone: chọn file .onnx trong ứng dụng Tệp (Files). Có thể chọn kèm model.json và file .data.</p></div>
+    <div data-pane="dir" hidden><button type="button" class="ghost-btn" id="mDirBtn">Chọn thư mục…</button><input type="file" id="mDir" webkitdirectory multiple hidden><p class="hint">Chỉ chạy trên Chrome/Edge máy tính. Ứng dụng quét mọi file .onnx (+ model.json nếu có).</p></div>
+    <div data-pane="url" hidden><input type="url" id="mUrl" placeholder="https://huggingface.co/…/resolve/main/model.onnx"><input type="url" id="mUrlJson" placeholder="(tuỳ chọn) link model.json"><p class="hint">Máy chủ phải cho phép CORS. Link Hugging Face dạng <code>/resolve/</code> dùng được.</p><button type="button" class="ghost-btn" id="mUrlGo">Tải từ link</button></div>
+    <label class="lbl">Tên hiển thị<input id="mName" placeholder="(tự đặt theo tên file)"></label>
+    <div id="mResult" class="mres"></div>
+    <div class="dlgbar"><button value="close" class="ghost-btn">Đóng</button></div>
+  </form>
+</dialog>
+<a id="dlA" hidden></a>
+<script>
+// Bật cô lập cross-origin (WASM đa luồng) qua service worker, rồi nạp app.
+if ('serviceWorker' in navigator && !self.crossOriginIsolated && !sessionStorage.coiTried) {
+  navigator.serviceWorker.register('sw.js').then(r => { if (!navigator.serviceWorker.controller || !self.crossOriginIsolated) { sessionStorage.coiTried = 1; navigator.serviceWorker.ready.then(() => location.reload()); } });
+} else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

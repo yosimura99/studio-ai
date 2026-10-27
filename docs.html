@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hướng dẫn · Studio AI</title><meta name="theme-color" content="#16151b"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<style>
+:root{--bg:#16151b;--p1:#1f1e26;--p2:#292833;--line:#363442;--tx:#ecebf3;--mu:#9d9aae;--ac:#9b6bff;--ac2:#c3a4ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;background:#121117;border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 8px) 14px 8px;display:flex;gap:10px;align-items:center}
+header a{color:var(--ac2);text-decoration:none;font-weight:600;padding:4px 8px;border-radius:8px;background:var(--p2)}
+main{max-width:860px;margin:0 auto;padding:16px 16px 60px}h1{font-size:24px}h2{margin-top:32px;color:var(--ac2);font-size:19px;border-bottom:1px solid var(--line);padding-bottom:4px}h3{font-size:16px;margin-top:20px}
+code,pre{background:var(--p2);border-radius:6px;font:13px/1.5 ui-monospace,Menlo,monospace}code{padding:1px 5px}pre{padding:10px 12px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{background:var(--p1)}
+.note{background:var(--p1);border-left:3px solid var(--ac);padding:10px 12px;border-radius:8px;margin:12px 0}.warn{border-color:#ff6b81}
+nav.toc{background:var(--p1);border-radius:10px;padding:8px 16px}nav.toc a{color:var(--ac2)}
+</style>
+<!-- Khóa PIN dùng chung với Studio Của Khang (cùng data-ns) -->
+<script src="js/lock.js" data-ns="studio" data-title="Studio Của Khang" data-icon="icons/icon-192.png"></script>
+</head>
+<body>
+<header><a href="./">‹ Studio AI</a><b>Hướng dẫn sử dụng</b></header>
+<main>
+<h1>Studio AI — Ghép mặt &amp; Tạo ảnh chạy ngay trên máy</h1>
+<p>Mọi thứ chạy <b>trong trình duyệt của bạn</b>: không cần API key, không có máy chủ, ảnh <b>không gửi đi đâu</b>. Lần đầu dùng một tính năng, app hỏi bạn có muốn tải model không (hiện rõ dung lượng). Tải xong là model được lưu lại trên máy, lần sau <b>dùng được cả khi không có mạng</b>.</p>
+<nav class="toc">
+<a href="#ghep">1. Ghép mặt</a> · <a href="#lenh">2. Lệnh tiếng Việt</a> · <a href="#tao">3. Tạo ảnh từ prompt / từ ảnh</a> · <a href="#model">4. Model có sẵn</a> · <a href="#tutai">5. Tự tải model (.onnx)</a> · <a href="#json">6. File model.json</a> · <a href="#bot">7. Bot API</a> · <a href="#iphone">8. iPhone</a> · <a href="#antoan">9. An toàn &amp; đồng ý</a>
+</nav>
+
+<h2 id="ghep">1. Ghép mặt</h2>
+<ol>
+<li>Bấm ô <b>Ảnh mặt nguồn</b> (khuôn mặt muốn dùng) và <b>Ảnh đích</b> (ảnh sẽ được thay mặt). Nếu ảnh có nhiều mặt, bấm vào mặt muốn chọn ở hàng hình nhỏ bên dưới.</li>
+<li>Chọn <b>Model ghép</b> (mặc định inswapper 128) và <b>Làm nét</b> (mặc định GFPGAN 1.4).</li>
+<li>Gõ lệnh hoặc bấm chip gợi ý, rồi bấm <b>Chạy</b>.</li>
+<li>Kéo thanh <b>Trước / sau</b> để so sánh. Ảnh ra <b>giữ nguyên độ phân giải gốc</b>.</li>
+</ol>
+<h3>Khoá vùng mặt &amp; cọ mặt nạ</h3>
+<p><b>Khoá vùng mặt</b> (bật sẵn) dùng mô hình phân vùng BiSeNet: chỉ thay da mặt, mắt, mũi, môi; tóc, tai, cổ và nền giữ nguyên. Sau khi chạy, bật <b>Cọ mặt nạ</b> để tô thêm (<i>Thêm</i>) hoặc xoá bớt (<i>Bớt</i>) vùng được thay — kết quả cập nhật ngay, không cần chạy lại model.</p>
+<div class="note">Cam kết kỹ thuật: mọi điểm ảnh <b>ngoài mặt nạ giống hệt ảnh gốc</b> (chênh lệch = 0). App tự đo và hiện con số này dưới kết quả.</div>
+<h3>Lịch sử</h3>
+<p>Mỗi lần chạy được thêm vào dải <b>Lịch sử</b>. <b>Tải ảnh</b> lưu ảnh đang xem (trên iPhone sẽ mở bảng Chia sẻ → <i>Lưu hình ảnh</i>), <b>Tải tất cả</b> lưu hết, <b>Xoá hết</b> dọn lịch sử.</p>
+
+<h2 id="lenh">2. Lệnh tiếng Việt</h2>
+<p>Ô <b>Lệnh</b> hiểu tiếng Việt có hoặc không dấu. Có thể ghép nhiều ý trong một câu, ví dụ: <code>ghép vào mặt thứ 2, giữ miệng, làm nét mạnh, xuất 4K</code>.</p>
+<table>
+<tr><th>Bạn gõ</th><th>Ý nghĩa</th></tr>
+<tr><td>ghép vào mặt thứ 2 · vào mặt số ba</td><td>Chọn mặt đích (đếm từ trái sang phải)</td></tr>
+<tr><td>lấy mặt thứ 2 · mặt 2 của ảnh nguồn</td><td>Chọn mặt nguồn</td></tr>
+<tr><td>mặt bên trái / bên phải / lớn nhất</td><td>Chọn mặt đích theo vị trí hoặc kích thước</td></tr>
+<tr><td>ghép tất cả các mặt · cả nhóm</td><td>Thay mọi khuôn mặt trong ảnh đích</td></tr>
+<tr><td>thay cả tóc · không khoá vùng</td><td>Tắt khoá vùng (thay cả ô vuông quanh mặt)</td></tr>
+<tr><td>giữ tóc · chỉ thay mặt · khoá vùng</td><td>Bật khoá vùng</td></tr>
+<tr><td>giữ miệng · giữ nụ cười · giữ răng</td><td>Giữ nguyên miệng của ảnh đích</td></tr>
+<tr><td>làm nét mạnh / làm nét nhẹ / không làm nét</td><td>Mức làm nét 100% / 50% / tắt</td></tr>
+<tr><td>không khớp màu</td><td>Tắt chỉnh màu da theo ảnh đích</td></tr>
+<tr><td>xuất 4K · xuất 2K · xuất Full HD · phóng to 2x</td><td>Phóng to ảnh kết quả</td></tr>
+<tr><td>dùng hyperswap · simswap 512 · ghost 2 · uniface</td><td>Đổi model ghép</td></tr>
+<tr><td>làm nét bằng codeformer · gpen · restoreformer</td><td>Đổi model làm nét</td></tr>
+</table>
+
+<h2 id="tao">3. Tạo ảnh từ prompt / từ ảnh</h2>
+<p>Gõ mô tả bằng <b>tiếng Việt</b> (app tự dịch sang tiếng Anh ngay trên máy bằng model opus-mt) hoặc tiếng Anh. Bấm chip phong cách: <b>Chân dung, Anime, Phong cảnh, Siêu thực, 3D, Tranh vẽ</b>.</p>
+<table>
+<tr><th>Mức</th><th>Model</th><th>Tải về</th><th>Chạy được trên</th></tr>
+<tr><td><b>Nhanh</b></td><td>SDXS-512 (1 bước)</td><td>≈ 0,9 GB</td><td>Mọi máy (WebGPU hoặc CPU). iPhone: vài chục giây/ảnh.</td></tr>
+<tr><td><b>Chất lượng cao</b></td><td>SD-Turbo (1–4 bước)</td><td>≈ 2,6 GB</td><td>Chỉ máy có <b>WebGPU</b> (Chrome/Edge máy tính, Safari iOS 26+). iPhone dễ thiếu bộ nhớ — app sẽ cảnh báo.</td></tr>
+</table>
+<p><b>Seed</b> giữ cố định để ra lại đúng ảnh; <b>Số bước</b> nhiều hơn → chi tiết hơn nhưng chậm hơn; <b>Kích thước</b> 512 là chuẩn (lớn hơn chậm và tốn RAM).</p>
+<p><b>Tạo từ ảnh</b> (img2img): chọn ảnh gốc và <b>Độ biến đổi</b> (thấp = giống ảnh gốc, cao = theo prompt nhiều hơn).</p>
+<div class="note">Hai model Turbo được huấn luyện để chạy <b>không cần “negative prompt”</b> (không dùng CFG), nên app không có ô đó — thay vào đó là bộ lọc an toàn ở mục 9.</div>
+
+<h2 id="model">4. Model có sẵn (tải khi cần)</h2>
+<p>Tab <b>Model</b> liệt kê tất cả model, dung lượng, giấy phép, nút <b>Tải</b> và <b>Xoá</b>. Không model nào tự tải khi chưa hỏi bạn.</p>
+<table>
+<tr><th>Model ghép</th><th>Dung lượng</th><th>Ghi chú</th><th>Giấy phép</th></tr>
+<tr><td>inswapper 128 (mặc định)</td><td>278 MB</td><td>Giống mặt nguồn nhất, ổn định</td><td>Phi thương mại (InsightFace)</td></tr>
+<tr><td>HyperSwap 1A / 1B / 1C · 256</td><td>403 MB mỗi bản</td><td>Nét hơn (256 px), giống mặt tốt</td><td>ResearchRAIL-M (FaceFusion)</td></tr>
+<tr><td>SimSwap 256 / SimSwap 512 (unofficial)</td><td>110 / 120 MB (+11 MB)</td><td>Giữ biểu cảm tốt, giống mặt vừa</td><td>Phi thương mại (neuralchen/SimSwap)</td></tr>
+<tr><td>GHOST 1 / 2 / 3 · 256</td><td>258 / 370 / 428 MB (+11 MB)</td><td>Tự nhiên, giống mặt khá</td><td>Apache-2.0 (ai-forever/ghost)</td></tr>
+<tr><td>UniFace 256</td><td>204 MB</td><td>Giống mặt yếu — chỉ để thử</td><td>Chưa rõ — chỉ dùng cá nhân</td></tr>
+</table>
+<table>
+<tr><th>Model làm nét</th><th>Dung lượng</th><th>Giấy phép</th></tr>
+<tr><td>GFPGAN 1.4 (mặc định)</td><td>170 MB</td><td>Apache-2.0</td></tr>
+<tr><td>CodeFormer</td><td>189 MB</td><td>S-Lab License 1.0 (phi thương mại)</td></tr>
+<tr><td>GPEN-BFR-512</td><td>142 MB</td><td>Phi thương mại (Alibaba DAMO)</td></tr>
+<tr><td>RestoreFormer++</td><td>148 MB</td><td>Apache-2.0</td></tr>
+</table>
+<p>Dùng chung (tải 1 lần ≈ 150 MB): SCRFD phát hiện mặt, ArcFace nhận dạng mặt, BiSeNet phân vùng mặt, open_nsfw lọc ảnh nhạy cảm.</p>
+
+<h2 id="tutai">5. Tự tải model của bạn (.onnx)</h2>
+<p>Bấm <b>+ Tải model</b> cạnh ô chọn model, có 3 cách:</p>
+<ul>
+<li><b>File .onnx</b> — chọn một file (kèm file <code>.data</code> nếu model có dữ liệu ngoài, và <code>model.json</code> nếu có).</li>
+<li><b>Thư mục</b> — chọn một thư mục; app quét mọi file <code>.onnx</code> trong đó, đọc <code>model.json</code> cùng thư mục (hoặc <code>&lt;tên&gt;.json</code> cùng tên).</li>
+<li><b>Link</b> — dán đường dẫn tải trực tiếp. Link Hugging Face dạng <code>/blob/</code> tự đổi sang <code>/resolve/</code>. Trang chứa file phải cho phép CORS (Hugging Face, GitHub Pages được; Google Drive, Mega thường không).</li>
+</ul>
+<p>App tự nhận loại model qua đầu vào/đầu ra (inswapper, HyperSwap, SimSwap, GHOST, UniFace, GFPGAN/GPEN/RestoreFormer, CodeFormer). Nếu không nhận ra, app hiện danh sách đầu vào/đầu ra và cho bạn <b>chọn kiểu</b> từ danh sách. Model đã tải được lưu trên máy (tên + dung lượng), xem và xoá ở tab <b>Model</b>. Model làm nét cũng thay được theo cách này.</p>
+<p>Với inswapper tự tải: cần ma trận <code>emap</code> — app tự đọc từ trong file onnx gốc (initializer cuối), hoặc lấy từ <code>emap_url</code> trong model.json.</p>
+
+<h2 id="json">6. File <code>model.json</code> (tuỳ chọn)</h2>
+<pre>{
+  "name": "Model của tôi",
+  "type": "hyperswap",          // inswapper | hyperswap | simswap_256 | simswap_512 | ghost | uniface | gfpgan | codeformer
+  "input_size": 256,            // cạnh ảnh mặt đầu vào
+  "embedding": "arcface",       // "arcface" (vector chuẩn hoá) | "arcface_emap" (kiểu inswapper)
+  "mean": [0.5, 0.5, 0.5],      // chuẩn hoá ảnh đầu vào (0..1)
+  "std":  [0.5, 0.5, 0.5],
+  "emap_url": "https://…/emap.bin"   // chỉ cho inswapper: 512×512 float32
+}</pre>
+<p>Trường thêm (nâng cao): <code>template</code> (<code>arcface_128</code>, <code>arcface_112_v1</code>, <code>arcface_112_v2</code>, <code>ffhq_512</code>), <code>denorm</code> (true nếu đầu ra trong khoảng −1..1 cần đổi lại theo mean/std).</p>
+<table><tr><th>Kiểu sẵn</th><th>Kích thước</th><th>Khung mặt</th><th>mean / std</th><th>Mặt nguồn</th></tr>
+<tr><td>inswapper</td><td>128</td><td>arcface_128</td><td>0 / 1</td><td>arcface_emap</td></tr>
+<tr><td>hyperswap</td><td>256</td><td>arcface_128</td><td>0.5 / 0.5</td><td>arcface</td></tr>
+<tr><td>simswap_256</td><td>256</td><td>arcface_112_v1</td><td>ImageNet</td><td>crossface_simswap</td></tr>
+<tr><td>simswap_512</td><td>512</td><td>arcface_112_v1</td><td>0 / 1</td><td>crossface_simswap</td></tr>
+<tr><td>ghost</td><td>256</td><td>arcface_112_v1</td><td>0.5 / 0.5</td><td>crossface_ghost</td></tr>
+<tr><td>uniface</td><td>256</td><td>ffhq_512</td><td>0.5 / 0.5</td><td>ảnh mặt nguồn</td></tr>
+<tr><td>gfpgan / gpen / restoreformer</td><td>512</td><td>ffhq_512</td><td>0.5 / 0.5</td><td>—</td></tr>
+<tr><td>codeformer</td><td>512</td><td>ffhq_512</td><td>0.5 / 0.5</td><td>weight 0.7</td></tr></table>
+
+<h2 id="bot">7. Bot API (cho bot / phím tắt)</h2>
+<h3>Qua đường link</h3>
+<pre>https://yosimura99.github.io/studio-ai/?mode=swap&amp;src=LINK_ANH_NGUON&amp;dst=LINK_ANH_DICH&amp;cmd=giữ%20miệng&amp;auto=1
+https://yosimura99.github.io/studio-ai/?mode=t2i&amp;prompt=con%20mèo%20trên%20mái%20nhà&amp;tier=fast&amp;seed=42&amp;auto=1</pre>
+<p>Tham số: <code>mode</code> (swap | t2i | i2i), <code>cmd</code>, <code>src</code>, <code>dst</code>, <code>model</code>, <code>prompt</code>, <code>tier</code> (fast | hq), <code>seed</code>, <code>size</code>, <code>init</code>, <code>strength</code>. Với <code>auto=1</code> app chạy luôn (không hỏi tải model). Xong sẽ đặt <code>document.documentElement.dataset.result = "ok" | "error"</code>, biến <code>window.studioAIResult</code> (dataURL) và gửi <code>postMessage</code> về cửa sổ đã mở nó (chỉ khi cùng origin). Nếu đã đặt mã PIN, bot chỉ chạy sau khi mở khoá.</p>
+<h3>Qua JavaScript</h3>
+<pre>await studioAI.ready;
+const url = await studioAI.run({ prompt: 'ghép vào mặt lớn nhất, làm nét mạnh',
+                                 source: fileHoacUrlHoacDataURL, target: '...' ,
+                                 swapper: 'hyperswap_1a_256', restorer: 'codeformer' });   // → dataURL PNG
+const img = await studioAI.generate({ prompt: 'phố cổ Hội An về đêm', tier: 'fast', seed: 1, style: 'Phong cảnh' });
+studioAI.models();   // danh sách model + trạng thái đã tải
+studioAI.last;       // thông tin lần chạy cuối (thời gian, chênh lệch ngoài mặt nạ…)</pre>
+
+<h2 id="iphone">8. Trên iPhone</h2>
+<ul>
+<li>Chạy trên Safari (nên <b>Thêm vào MH chính</b>). Model lưu trong bộ nhớ trình duyệt; iOS có thể xoá nếu lâu không mở app.</li>
+<li>Chọn file <code>.onnx</code>: dùng ứng dụng <b>Tệp</b> (Files). <b>Chọn thư mục chỉ có trên Chrome/Edge máy tính</b>.</li>
+<li>Ghép mặt inswapper + GFPGAN cần ≈ 0,6 GB RAM; HyperSwap/GHOST 3 cần ≈ 0,9 GB — máy cũ (RAM 3–4 GB) có thể bị Safari tải lại trang. Khi đó chọn inswapper, tắt làm nét hoặc dùng ảnh nhỏ hơn.</li>
+<li>Không có WebGPU (iOS &lt; 26): chạy bằng CPU, ghép mặt ≈ 20–60 giây; mức “Chất lượng cao” không dùng được.</li>
+</ul>
+
+<h2 id="antoan">9. An toàn &amp; đồng ý</h2>
+<div class="note warn">
+<p><b>Chỉ ghép mặt của người đã đồng ý.</b> Không dùng để mạo danh, lừa đảo, bôi nhọ hay tạo nội dung khiêu dâm. Bạn chịu trách nhiệm với ảnh mình tạo ra.</p>
+<ul>
+<li>Bộ lọc open_nsfw kiểm tra <b>ảnh đầu vào và ảnh kết quả</b>; ảnh nhạy cảm bị chặn.</li>
+<li>Prompt có từ khoá tình dục, hoặc liên quan trẻ vị thành niên trong ngữ cảnh nhạy cảm (tiếng Việt và tiếng Anh) bị từ chối.</li>
+<li>App không chứa model của người nổi tiếng/idol và không có model “không kiểm duyệt”.</li>
+</ul>
+</div>
+<p style="color:var(--mu);font-size:13px">Studio AI là một phần của <a href="../studio/" style="color:var(--ac2)">Studio Của Khang</a>. Danh sách giấy phép đầy đủ ở file README của dự án.</p>
+</main>
+</body>
+</html>
