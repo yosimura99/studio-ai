@@ -14,7 +14,7 @@
   const NS = (ds.ns || 'studio').replace(/[^\w-]/g, '');
   const TITLE = ds.title || document.title || 'Ứng dụng';
   const ICON = ds.icon || '';
-  const K = { data: NS + '-lock-v1', fail: NS + '-lock-fail', hidden: NS + '-lock-hiddenAt' };
+  const K = { data: NS + '-lock-v1', fail: NS + '-lock-fail', hidden: NS + '-lock-hiddenAt', pass: NS + '-lock-pass' };
   const ITER = 150000, MINLEN = 4, MAXLEN = 6, FREE_TRIES = 5, AUTOLOCK_MS = 5 * 60 * 1000;
   const root = document.documentElement;
   root.classList.add('sl-locked');
@@ -322,10 +322,16 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
       const box = el('div', { class: 'sl-root' }, el('div', { class: 'sl-box' }, el('div', { class: 'sl-title' }, 'Không thể bật khóa'), el('div', { class: 'sl-msg' }, 'Trình duyệt này không hỗ trợ mã hóa (cần HTTPS). Hãy mở ứng dụng qua địa chỉ https.')));
       document.body.append(box); return;
     }
-    if (getData()) lock();
+    if (getData()) {
+      // chuyển trang trong cùng tab (vd. Studio ↔ Studio AI) trong vòng 60 giây → không hỏi lại mã PIN
+      let t = 0; try { t = +sessionStorage.getItem(K.pass) || 0; sessionStorage.removeItem(K.pass); } catch (e) { }
+      if (t && Date.now() - t >= 0 && Date.now() - t < 60000) return unlocked();
+      lock();
+    }
     else pinScreen('setup', { done: ok => { if (ok) unlocked(); } });
   }
 
+  window.addEventListener('pagehide', () => { if (!locked) try { sessionStorage.setItem(K.pass, String(Date.now())); } catch (e) { } });
   /* ---------- tự khóa khi ở nền > 5 phút ---------- */
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { if (!locked) lsSet(K.hidden, Date.now()); }
