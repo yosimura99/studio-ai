@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ghép Mặt Video · Studio AI</title>
+<meta name="description" content="Ghép mặt AI và tạo ảnh từ chữ chạy hoàn toàn trên máy – không cần mạng sau khi tải model, không gửi ảnh đi đâu.">
+<meta name="theme-color" content="#16151b">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Studio AI">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+<!-- Khóa PIN dùng chung với Pỏn của Khang (cùng data-ns "studio") -->
+<script src="js/lock.js" data-ns="studio" data-title="Studio AI" data-icon="icons/icon-192.png"></script>
+<style>
+.vw{max-width:760px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--p1);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.card h3{margin:0 0 8px;font-size:15px}
+.vslots{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+.vslots .slot{aspect-ratio:auto;min-height:150px}
+.vslots .slot img,.vslots .slot video{width:100%;height:100%;object-fit:cover;display:block}
+#pick{width:100%;border-radius:10px;background:#000;display:block;touch-action:manipulation;cursor:crosshair}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cmp canvas{width:100%;border-radius:10px;background:#000}
+.cmp small{color:var(--mu);font-size:12px}
+#outV{width:100%;border-radius:12px;background:#000;max-height:70vh}
+.btns{display:flex;gap:8px;flex-wrap:wrap}.btns .ghost-btn{flex:1}
+.cancel{width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--bad);background:none;color:var(--bad);font-weight:600}
+.stat2{font-size:12.5px;color:var(--mu);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="./">‹ Trang chủ</a>
+  <span class="brand"><img src="icons/icon.svg" alt="" width="24" height="24"><h1>Ghép Mặt Video</h1></span>
+  <span class="badge" id="backend">…</span>
+</header>
+<div class="vw">
+  <div class="card">
+    <p class="hint" style="margin-top:0">Khuôn mặt trong ảnh nguồn được ghép vào người trong clip, <b>bám theo cử động, há miệng, cười</b> của clip từng khung. Chạy hoàn toàn trên máy — không gửi ảnh/video đi đâu.</p>
+    <div class="vslots">
+      <label class="slot" id="srcSlot"><input type="file" id="srcFile" accept="image/*" hidden><div class="ph"><b>＋</b>Ảnh khuôn mặt<small>(mặt sẽ được ghép vào)</small></div></label>
+      <label class="slot" id="vidSlot"><input type="file" id="vidFile" accept="video/*" hidden><div class="ph"><b>＋</b>Video<small id="vidLimit">iPhone: tối đa 30 giây, 720p</small></div></label>
+    </div>
+    <label class="consent"><input type="checkbox" id="consent"><span style="font-size:13px">Tôi có quyền dùng ảnh và video này, người trong đó đã đồng ý, và tôi không dùng để lừa đảo, mạo danh, bôi nhọ hay tạo nội dung khiêu dâm.</span></label>
+  </div>
+
+  <div class="card" id="pickCard" hidden>
+    <h3>Chạm vào khuôn mặt cần thay (khung đầu)</h3>
+    <canvas id="pick"></canvas>
+    <p class="hint" id="pickHint"></p>
+    <div class="row2">
+      <label>Từ giây<input type="number" id="tFrom" min="0" step="0.1" value="0"></label>
+      <label>Đến giây<input type="number" id="tTo" min="0" step="0.1" value="0"></label>
+    </div>
+    <div class="row2">
+      <label>Độ phân giải (cạnh dài)<select id="res"></select></label>
+      <label>Khung hình/giây<select id="fps"></select></label>
+    </div>
+    <div class="toggles">
+      <label class="sw"><input type="checkbox" id="keepMouth" checked><i></i>Giữ trong miệng gốc (răng, lưỡi theo clip)</label>
+      <label class="sw"><input type="checkbox" id="colorOn" checked><i></i>Khớp màu da theo cảnh</label>
+      <label class="sw"><input type="checkbox" id="restoreOn"><i></i>Làm nét mặt (GFPGAN — chậm hơn nhiều)</label>
+      <label class="sw"><input type="checkbox" id="gpuOn"><i></i>Dùng GPU (WebGPU) nếu có</label>
+    </div>
+    <p class="hint" id="estHint"></p>
+  </div>
+
+  <div class="card" id="prevCard" hidden>
+    <h3>Xem thử 1 khung</h3>
+    <input type="range" id="pT" min="0" max="1" step="0.01" value="0">
+    <div class="btns"><button class="ghost-btn" id="prevBtn">Xem thử khung này</button></div>
+    <div class="cmp" id="cmp" hidden><div><canvas id="cA"></canvas><small>Gốc</small></div><div><canvas id="cB"></canvas><small id="cBcap">Đã ghép</small></div></div>
+  </div>
+
+  <button class="run" id="go" disabled>Ghép video</button>
+  <div class="status" id="status" hidden><div class="bar"><i id="barI"></i></div><div class="stat2"><span id="statusText"></span><span id="eta"></span></div><button class="cancel" id="cancel" hidden>Huỷ</button></div>
+
+  <div class="card" id="outCard" hidden>
+    <h3>Kết quả</h3>
+    <video id="outV" controls playsinline></video>
+    <div class="btns"><button class="ghost-btn" id="dl">Tải về</button><button class="ghost-btn" id="share">Chia sẻ</button></div>
+    <p class="hint" id="outHint"></p>
+  </div>
+  <p class="hint">Lưu ý: model ghép mặt làm việc ở 128 px nên cận cảnh sát mặt sẽ mất chi tiết; mặt nghiêng quá ~60° được giữ nguyên khung gốc. Nội dung khiêu dâm sẽ bị từ chối.</p>
+</div>
+<a id="dlA" hidden></a>
+<script>
+// Trang video: bật cô lập cả trên điện thoại để chạy WASM đa luồng (ghép từng khung rất nặng).
+if ('serviceWorker' in navigator && !self.crossOriginIsolated && !sessionStorage.coiTried) {
+  navigator.serviceWorker.register('sw.js').then(r => { if (!navigator.serviceWorker.controller || !self.crossOriginIsolated) { sessionStorage.coiTried = 1; navigator.serviceWorker.ready.then(() => (window.StudioLock && StudioLock.reload ? StudioLock.reload() : location.reload())); } });
+} else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+<script src="vendor/mp4-muxer.js"></script>
+<script src="vendor/webm-muxer.js"></script>
+<script type="module" src="js/vswap.js"></script>
+</body>
+</html>

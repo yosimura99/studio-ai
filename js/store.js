@@ -36,7 +36,7 @@ export function backendLabel() {
   return backend === 'webgpu' ? `WebGPU${hasF16 ? ' (fp16)' : ''}` : `WASM CPU · ${threads()} luồng`;
 }
 // iPhone/máy ít RAM: 1 luồng (mỗi luồng WASM thêm stack + bộ nhớ chia sẻ lớn hơn), không dò WebGPU khi mở trang.
-const threads = () => (self.crossOriginIsolated && !lowMem) ? Math.min(4, navigator.hardwareConcurrency || 4) : 1;
+const threads = () => (self.crossOriginIsolated && (!lowMem || self.__threads)) ? Math.min(self.__threads || 4, navigator.hardwareConcurrency || 4) : 1;
 /** Lỗi thiếu RAM/khởi tạo ONNX → câu tiếng Việt dễ hiểu */
 export function friendlyError(e) {
   const m = String(e?.message || e || '');
@@ -189,7 +189,7 @@ export const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.
 export const isMobile = isIOS || /Android|Mobile/i.test(navigator.userAgent);
 // điện thoại/máy tính bảng hoặc máy ≤4 GB RAM → chế độ tiết kiệm RAM (int8/fp16, 1 luồng, mỗi model 1 worker riêng)
 export const lowMem = isMobile || !!(navigator.deviceMemory && navigator.deviceMemory <= 4);
-function gpuOptIn() { try { return localStorage.getItem('studioai.gpu') === '1'; } catch { return false; } }
+function gpuOptIn() { if (self.__gpu) return true; try { return localStorage.getItem('studioai.gpu') === '1'; } catch { return false; } }
 export const ortStarted = () => !!ortP;
 
 // ---------- model tự tải (người dùng) ----------
