@@ -6,7 +6,11 @@ const GPU_FLAG = 'studioai.v.gpucrash', RUN_FLAG = 'studioai.v.running';
 const ls = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const IN = { src: $('#srcFile'), vid: $('#vidFile') };
 const st = { src: null, vurl: null, file: null, ready: false, sel: 0, faces: [], scanned: new Set(), busy: false, cancel: false, msPer: 0, out: null, w: null, backend: '' };
-const video = document.createElement('video'); video.muted = true; video.playsInline = true; video.setAttribute('playsinline', ''); video.preload = 'auto'; video.crossOrigin = 'anonymous';
+// Một thẻ <video> duy nhất, GẮN VÀO TRANG (ô Video) và hiển thị được: iOS Safari không nạp/giải mã khung cho video tách rời trang
+// hoặc chưa từng play() — đó là lý do lỗi "Không tua được video" trên iPhone.
+const video = document.createElement('video');
+video.muted = true; video.defaultMuted = true; video.setAttribute('muted', ''); video.playsInline = true; video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', '');
+video.preload = 'auto'; video.disablePictureInPicture = true; video.setAttribute('disableremoteplayback', ''); video.className = 'vsrc';
 
 // ---------- worker RPC ----------
 let W = null, seq = 0; const pend = new Map(); let onProg = null;
@@ -27,7 +31,7 @@ const fmt = (s) => s >= 90 ? `${Math.floor(s / 60)} phút ${Math.round(s % 60)} 
 function lockUI(on) { IN.src.disabled = IN.vid.disabled = on; for (const id of ['#go', '#prevBtn', '#res', '#fps', '#tFrom', '#tTo', '#restoreOn', '#gpuOn', '#keepMouth', '#colorOn']) $(id).disabled = on; if (!on) $('#go').disabled = !canRun(); }
 const canRun = () => st.src && st.file && st.faces.length && $('#consent').checked && !st.busy;
 const MB = (b) => (b / 1048576).toFixed(0) + ' MB';
-$('#vidLimit').textContent = S.lowMem ? 'Điện thoại: tối đa 30 giây, 720p' : 'Máy tính: tối đa 3 phút, 1080p+';
+const VLIM = S.lowMem ? 'Điện thoại: tối đa 30 giây, 720p' : 'Máy tính: tối đa 3 phút, 1080p+'; $('#vidLimit').textContent = VLIM;
 const gpuAvail = !!navigator.gpu;
 $('#gpuOn').checked = gpuAvail && !ls.get(GPU_FLAG); $('#gpuOn').closest('label').hidden = !gpuAvail;
 $('#restoreOn').checked = !S.lowMem && gpuAvail;
@@ -41,18 +45,63 @@ IN.src.onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
   try { const img = await loadImg(f); st.src = img; st.srcScanned = false; $('#srcSlot').replaceChildren(IN.src, img); await prepare(); } catch (err) { fail(err); }
 };
+const BAD_FMT = 'Trình duyệt không giải mã được video này (thường là video HEVC/HDR từ camera iPhone hoặc codec lạ). Cách khắc phục: (1) Mở app Ảnh → chọn video → Chia sẻ → "Lưu vào Tệp" rồi chọn lại, hoặc Sửa → Xong → "Lưu thành video mới"; (2) Cài đặt → Camera → Định dạng → chọn "Tương thích nhất" rồi quay lại; (3) Dùng bản MP4 (H.264) tải từ TikTok/Facebook.';
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+function waitEv(el, evs, ms) { return new Promise(res => { let t = 0; const h = (e) => { clean(); res(e.type); }; const clean = () => { clearTimeout(t); for (const n of evs) el.removeEventListener(n, h); }; for (const n of evs) el.addEventListener(n, h); t = setTimeout(() => { clean(); res(null); }, ms); }); }
+function frameCb(ms) {   // chờ 1 khung được trình chiếu (rVFC) — có thời hạn
+  return new Promise(res => {
+    if (!('requestVideoFrameCallback' in video)) { setTimeout(() => res(null), Math.min(ms, 150)); return; }
+    let done = false; const id = video.requestVideoFrameCallback((n, m) => { if (!done) { done = true; res(m.mediaTime ?? video.currentTime); } });
+    setTimeout(() => { if (!done) { done = true; try { video.cancelVideoFrameCallback(id); } catch {} res(null); } }, ms);
+  });
+}
+async function tryPlay(ms = 2500) { try { const p = video.play(); if (p) await Promise.race([p, sleep(ms)]); return !video.paused; } catch { return false; } }
+function vidPlaceholder(msg) { const ph = document.createElement('div'); ph.className = 'ph'; ph.innerHTML = `<b>＋</b>Video<small>${msg || ''}</small>`; $('#vidSlot').replaceChildren(IN.vid, ph); }
+// Gửi file cho service worker → nhận URL thường (hỗ trợ Range). null nếu không có SW điều khiển trang.
+async function swUrl(f) {
+  const ctl = navigator.serviceWorker?.controller; if (!ctl) return null;
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const ext = (f.name.split('.').pop() || '').toLowerCase(), apple = /iPhone|iPad|Macintosh/.test(navigator.userAgent) && !/Chrome|Android/.test(navigator.userAgent);
+  let mime = f.type || ({ mov: 'video/quicktime', m4v: 'video/mp4', webm: 'video/webm', mkv: 'video/webm' }[ext] || 'video/mp4');
+  if (mime === 'video/quicktime' && !apple) mime = 'video/mp4';
+  const ok = await new Promise(res => { try { const ch = new MessageChannel(); ch.port1.onmessage = () => res(true); ctl.postMessage({ type: 'vfile', id, blob: f, mime }, [ch.port2]); setTimeout(() => res(false), 4000); } catch { res(false); } });
+  return ok ? new URL('__vfile/' + id, location.href).href : null;
+}
+// Mở 1 nguồn và kiểm tra thật sự giải mã + tua được (trả về lỗi dạng chuỗi nếu không)
+async function tryOpen(src) {
+  st.playMode = false; video.pause(); video.removeAttribute('src'); video.src = src; video.load();
+  const pp = video.play(); if (pp) pp.catch(() => {});
+  const ev = await waitEv(video, ['loadedmetadata', 'error'], 12000);
+  if (ev !== 'loadedmetadata' || !video.videoWidth) return 'meta:' + (video.error?.code || 'timeout');
+  if (video.readyState < 2) { if (video.paused) await tryPlay(); await Promise.race([waitEv(video, ['loadeddata', 'canplay', 'playing', 'error'], 10000), frameCb(10000)]); }
+  if (video.error) return 'data:' + video.error.code;
+  st.srcFps = await probeFps(); video.pause();
+  const D = video.duration || 0, mid = Math.min(1, D / 2);
+  if (!(await seek(mid, true)) || Math.abs(video.currentTime - mid) > 0.3) return 'seek';
+  if (!(await seek(0.001, true))) return 'seek0';
+  if (video.error) return 'err:' + video.error.code;
+  if (!(await hasPicture())) return 'black';
+  return null;
+}
+IN.vid.addEventListener('click', () => { try { const p = video.play(); if (p) p.catch(() => {}); video.pause(); } catch {} });   // chạm thật vào ô → "mở khoá" phát video trên iOS
 IN.vid.onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
+  if (st.vurl) URL.revokeObjectURL(st.vurl);
+  st.file = f; st.vurl = URL.createObjectURL(f); st.scanned = new Set(); st.faces = []; st.playMode = false;
+  $('#pickCard').hidden = true; $('#prevCard').hidden = true; lockUI(st.busy);
+  // gắn video vào trang ngay (iOS cần thẻ video nằm trong trang, hiển thị được) + play() ngay trong sự kiện
+  video.src = st.vurl; const p0 = video.play(); if (p0) p0.catch(() => {});
+  $('#vidSlot').replaceChildren(IN.vid, video);
   try {
-    if (st.vurl) URL.revokeObjectURL(st.vurl);
-    st.file = f; st.vurl = URL.createObjectURL(f); st.scanned = new Set(); st.faces = [];
-    video.src = st.vurl; await new Promise((res, rej) => { video.onloadedmetadata = res; video.onerror = () => rej(new Error('Không mở được video này (định dạng không hỗ trợ). Thử file MP4/MOV.')); });
-    await seek(0.05);
-    const th = document.createElement('video'); th.src = st.vurl; th.muted = true; th.playsInline = true; th.setAttribute('playsinline', ''); th.preload = 'metadata'; th.currentTime = 0.1;
-    $('#vidSlot').replaceChildren(IN.vid, th);
-    st.srcFps = await probeFps();
-    setupControls(); await prepare();
-  } catch (err) { fail(err); }
+    status('Đang mở video…', 0.01);
+    const srcs = [await swUrl(f), st.vurl].filter(Boolean); let why = [];
+    for (const src of srcs) { const r = await tryOpen(src); if (!r) { why = null; break; } why.push((src.startsWith('blob:') ? 'blob ' : 'sw ') + r); console.warn('mở video thất bại', src.slice(0, 40), r); }
+    if (why) {   // cuối cùng: chế độ phát-từng-bước nếu ít nhất phát được
+      if (video.videoWidth && video.readyState >= 2 && !video.error && (await playTo(0.3)) && video.currentTime > 0.05) { st.playMode = true; console.warn('dùng chế độ phát từng bước', why); }
+      else throw new Error(BAD_FMT + ' [' + why.join(', ') + ']');
+    }
+    setupControls(); status('', null); await prepare();
+  } catch (err) { video.pause(); video.removeAttribute('src'); try { video.load(); } catch {} st.file = null; vidPlaceholder(VLIM); fail(err); }
 };
 $('#consent').onchange = () => { lockUI(st.busy); };
 
@@ -66,27 +115,54 @@ function setupControls() {
   $('#pT').max = d.toFixed(2); $('#pT').value = Math.min(d, 1).toFixed(2);
   if (d > LIM.dur) $('#pickHint').textContent = `Video dài ${d.toFixed(1)} s — ${S.lowMem ? 'trên điện thoại' : ''} chỉ ghép tối đa ${LIM.dur} s, chọn đoạn bên dưới.`;
 }
-function seek(t) {
-  return new Promise((res, rej) => {
-    const to = setTimeout(() => rej(new Error('Không tua được video (trình duyệt không giải mã được khung này).')), 15000);
-    const done = () => { clearTimeout(to); if ('requestVideoFrameCallback' in video) { let ok = false; video.requestVideoFrameCallback(() => { if (!ok) { ok = true; res(); } }); setTimeout(() => { if (!ok) { ok = true; res(); } }, 60); } else res(); };
-    if (Math.abs(video.currentTime - t) < 1e-4 && video.readyState >= 2) { clearTimeout(to); res(); return; }
-    video.addEventListener('seeked', done, { once: true }); video.currentTime = t;
-  });
+// Tua tới t (giây) chắc chắn có khung: chờ 'seeked' + rVFC (có thời hạn); nếu iOS không phản hồi thì "huých" bằng play()/pause().
+async function seek(t, strict) {
+  const D = video.duration || 0; t = Math.max(0.001, D ? Math.min(t, D - 0.001) : t);
+  if (st.playMode) return playTo(t);
+  for (let k = 0; k < 3; k++) {
+    if (video.error) break;   // lỗi giải mã: thôi, đừng chờ
+    if (!video.seeking && video.readyState >= 2 && Math.abs(video.currentTime - t) < 1e-3) return true;
+    const fc = frameCb(k ? 2500 : 1200), ev = waitEv(video, ['seeked'], k ? 6000 : 4000);
+    video.currentTime = t;
+    if (await ev) { await Promise.race([fc, sleep(150)]); if (video.readyState >= 2) return true; }
+    // huých: phát ngắn rồi dừng (iOS đôi khi chỉ giải mã sau khi play())
+    await tryPlay(1500); await Promise.race([frameCb(1500), waitEv(video, ['timeupdate', 'playing'], 1500)]); video.pause();
+    if (video.readyState >= 2 && Math.abs(video.currentTime - t) < 0.25) return true;
+  }
+  // tua không được → chuyển sang chế độ phát-từng-bước (chỉ đi tới)
+  if (strict || video.error) return false;
+  console.warn('seek không ổn định → chế độ phát từng bước'); st.playMode = true; return playTo(t);
+}
+async function playTo(t) {
+  const half = 0.5 / (st.srcFps || 30);
+  if (video.currentTime > t + 0.25) { video.currentTime = t; await Promise.race([waitEv(video, ['seeked'], 3000), frameCb(3000)]); }   // lùi lại (thử, không chờ lâu)
+  if (video.currentTime >= t - half && video.readyState >= 2) return true;   // đã tới/qua: dùng khung hiện tại
+  const T = performance.now();
+  if (!(await tryPlay(3000))) return false;
+  while (performance.now() - T < 15000) { const m = await frameCb(2000); if (video.ended || video.error) break; if ((m ?? video.currentTime) >= t - half) break; }
+  video.pause(); return video.readyState >= 2 && !video.error;
 }
 async function probeFps() {
   if (!('requestVideoFrameCallback' in video)) return 30;
   try {
-    const ts = []; video.currentTime = 0; await new Promise(r => video.addEventListener('seeked', r, { once: true }));
-    const p = new Promise(res => { const cb = (n, m) => { ts.push(m.mediaTime); if (ts.length < 14) video.requestVideoFrameCallback(cb); else res(); }; video.requestVideoFrameCallback(cb); setTimeout(res, 2500); });
-    await video.play(); await p; video.pause();
+    const ts = []; if (video.paused && !(await tryPlay())) return 30;
+    await new Promise(res => { const cb = (n, m) => { ts.push(m.mediaTime); if (ts.length < 14) video.requestVideoFrameCallback(cb); else res(); }; video.requestVideoFrameCallback(cb); setTimeout(res, 2500); });
+    video.pause();
     const d = []; for (let i = 1; i < ts.length; i++) if (ts[i] > ts[i - 1]) d.push(ts[i] - ts[i - 1]); d.sort((a, b) => a - b);
-    const med = d[Math.floor(d.length / 2)]; return med ? Math.min(60, 1 / med) : 30;
-  } catch { return 30; }
+    const med = d[Math.floor(d.length / 2)]; return med ? Math.max(10, Math.min(60, 1 / med)) : 30;
+  } catch { return 30; } finally { video.pause(); }
 }
+const probeC = document.createElement('canvas'); probeC.width = probeC.height = 16;
+function blackFrame() { try { const g = probeC.getContext('2d', { willReadFrequently: true }); g.drawImage(video, 0, 0, 16, 16); const d = g.getImageData(0, 0, 16, 16).data; let mx = 0; for (let i = 0; i < d.length; i += 4) mx = Math.max(mx, d[i], d[i + 1], d[i + 2]); return mx < 6; } catch { return false; } }
+async function hasPicture() { for (let k = 0; k < 3; k++) { if (!blackFrame()) return true; await tryPlay(1200); await frameCb(1200); video.pause(); } return !blackFrame() || video.readyState >= 2; }
 function dims() { const vw = video.videoWidth, vh = video.videoHeight; const L = +$('#res').value || Math.max(vw, vh); const sc = Math.min(1, L / Math.max(vw, vh)); return [Math.round(vw * sc / 2) * 2, Math.round(vh * sc / 2) * 2]; }
 const grabC = { c: null };
-async function grab(t, w, h) { await seek(t); if (!grabC.c || grabC.c.width !== w || grabC.c.height !== h) grabC.c = new OffscreenCanvas(w, h); const g = grabC.c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(video, 0, 0, w, h); return grabC.c.transferToImageBitmap ? (() => { const b = grabC.c.transferToImageBitmap(); return b; })() : createImageBitmap(grabC.c); }
+async function grab(t, w, h) {
+  if (!(await seek(t))) throw new Error('Không tua được video. ' + BAD_FMT);
+  if (!grabC.c || grabC.c.width !== w || grabC.c.height !== h) { grabC.c = document.createElement('canvas'); grabC.c.width = w; grabC.c.height = h; }
+  const g = grabC.c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(video, 0, 0, w, h);   // HDR (HEVC 10-bit): Safari tự chuyển về SDR khi vẽ
+  return createImageBitmap(grabC.c);
+}
 
 // ---------- chuẩn bị: tải model, kiểm duyệt ảnh nguồn, dò mặt khung đầu ----------
 const LIST = () => [['face', 'det', 'dò mặt'], ['face', 'arcface', 'nhận diện'], ['swap', 'inswapper_128', 'ghép mặt'], ['face', 'bisenet', 'mặt nạ'], ...($('#restoreOn').checked ? [['restore', 'gfpgan_1.4', 'làm nét']] : [])];
@@ -287,4 +363,5 @@ $('#share').onclick = async () => {
   if (!st.out) return; const f = new File([st.out.blob], `studio-ai-video.${st.out.ext}`, { type: st.out.mime });
   try { if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: 'Studio AI' }); else $('#dl').click(); } catch (e) { if (e.name !== 'AbortError') $('#dl').click(); }
 };
+if (/[?&]vtest\b/.test(location.search)) window.__vtest = { grab, seek, st, video };
 window.addEventListener('pagehide', () => { if (!st.busy) ls.set(RUN_FLAG, null); });
