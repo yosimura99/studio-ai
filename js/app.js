@@ -18,12 +18,12 @@ function status(text, frac, err) {
   const el = $('#status'); el.hidden = !text; el.classList.toggle('err', !!err); $('#statusText').textContent = text || '';
   if (frac != null) $('#bar').style.width = Math.round(frac * 100) + '%';
 }
-const fail = (e) => { console.warn(e); status('⚠️ ' + (e?.message || e), null, true); };
+const fail = (e) => { console.warn(e); status('⚠️ ' + S.friendlyError(e), null, true); };
 function ask(msg) { return st.auto ? true : confirm(msg); }
 
 // ---------- tải model khi cần ----------
 async function missing(groups) {
-  const out = []; for (const [g, ids] of groups) for (const id of ids) if (!(await S.isCached(g, [id]))) out.push([g, id, REG[g][id].bytes]);
+  const out = []; for (const [g, ids] of groups) for (const id of ids) if (!(await S.isCached(g, [id]))) out.push([g, id, S.sizeOf(REG[g][id])]);
   return out;
 }
 async function ensure(groups, what) {
@@ -32,7 +32,7 @@ async function ensure(groups, what) {
   if (!ask(`${what} cần tải ${MB(total)} model (chỉ lần đầu, sau đó dùng offline).\n\n${miss.map(m => '• ' + (REG[m[0]][m[1]].label || m[1]) + ' — ' + MB(m[2])).join('\n')}\n\nTiếp tục?`)) { status('Đã huỷ tải model.'); return false; }
   let done = 0;
   for (const [g, id, b] of miss) {
-    await S.download(g, [id], (d) => status(`Đang tải model ${REG[g][id].label || id}… ${MB(done + d)} / ${MB(total)}`, (done + d) / total));
+    await S.download(g, [id], (d) => status(`Đang tải model ${REG[g][id].label || id}… ${MB(done + d)} / ${MB(total)}`, (done + d) / total), st.ac?.signal);
     done += b;
   }
   refreshModels(); return true;
@@ -48,7 +48,7 @@ function swapGroups(sw, rs) {
 
 // ---------- ảnh vào ----------
 async function setSlot(slot, key, file) {
-  const img = await loadImage(file); st[key] = { img, faces: null, sel: null };
+  const img = await loadImage(file, S.lowMem ? 1080 : 0); st[key] = { img, faces: null, sel: null };
   const el = $(slot); const im = el.querySelector('img'); im.src = img.toDataURL('image/jpeg', 0.85); im.hidden = false; el.querySelector('.ph').hidden = true;
   if (key !== 'init') await detectFaces(key);
 }
@@ -69,7 +69,7 @@ function drawFaces(key) {
 async function coreSwap({ srcImg, dstImg, cmd = '', ui = {}, srcSel, dstSel }) {
   const c = parseCommand(cmd);
   const sw = c.swapper ? { src: 'reg', id: c.swapper } : (ui.swapper || { src: 'reg', id: 'inswapper_128' });
-  let rs = c.restorer ? { src: 'reg', id: c.restorer } : (ui.restorer === undefined ? { src: 'reg', id: 'gfpgan_1.4' } : ui.restorer);
+  let rs = c.restorer ? { src: 'reg', id: c.restorer } : (ui.restorer === undefined ? (S.lowMem ? null : { src: 'reg', id: 'gfpgan_1.4' }) : ui.restorer);
   if (c.restore === false) rs = null; else if (c.restore === true && !rs) rs = { src: 'reg', id: 'gfpgan_1.4' };
   if (!(await ensure(swapGroups(sw, rs), 'Ghép mặt'))) throw new Error('Chưa có model.');
   status('Nhận diện khuôn mặt…', 0.1);
@@ -107,6 +107,16 @@ async function runSwap() {
 }
 
 // ---------- TẠO ẢNH (lõi) ----------
+// phóng ảnh rẻ bằng canvas lên cạnh dài `L` + làm nét nhẹ (unsharp 3x3) — không dùng AI upscaler
+function upTo(src, L) {
+  if (!L || Math.max(src.width, src.height) >= L) return src;
+  const k = L / Math.max(src.width, src.height), w = Math.round(src.width * k), h = Math.round(src.height * k);
+  const c = canvas(w, h), g = ctx2d(c); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, w, h);
+  const im = g.getImageData(0, 0, w, h), d = im.data, o = new Uint8ClampedArray(d), a = 0.35;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = (y * w + x) * 4;
+    for (let ch = 0; ch < 3; ch++) { const j = i + ch; const bl = (o[j - 4] + o[j + 4] + o[j - w * 4] + o[j + w * 4]) / 4; d[j] = o[j] + a * (o[j] - bl); } }
+  g.putImageData(im, 0, 0); return c;
+}
 async function coreGen({ prompt, tier = 'fast', seed, steps, size = 512, init = null, strength = 0.55, style = null }) {
   const sup = G.tierSupported(tier); if (!sup.ok) throw new Error(sup.why);
   const T = G.TIERS[tier]; const groups = [[T.group, init ? T.ids : T.ids.slice(0, 3)]];
@@ -116,7 +126,8 @@ async function coreGen({ prompt, tier = 'fast', seed, steps, size = 512, init = 
   status('Dịch prompt…', 0.05);
   const tr = await translate(prompt);
   const en = [tr.text.replace(/[.。!?\s]+$/, ''), style && STYLE_CHIPS[style]].filter(Boolean).join(', ');
-  const out = await G.generate({ tier, prompt: en, seed, steps, size, init, strength, onStep: (m, p) => status(m, 0.1 + p * 0.85), onProgress: (d, t) => status(`Đang tải model… ${MB(d)} / ${MB(t)}`, d / t) });
+  const out0 = await G.generate({ tier, prompt: en, seed, steps, size, init, strength, signal: st.ac?.signal, onStep: (m, p) => status(m, 0.1 + p * 0.85), onProgress: (d, t) => status(`Đang tải model… ${MB(d)} / ${MB(t)}`, d / t) });
+  const out = upTo(out0, S.isMobile || S.lowMem ? 720 : 0); out.meta = out0.meta;
   out.meta.en = en; out.meta.how = tr.how; return out;
 }
 async function runGen() {
@@ -132,8 +143,8 @@ async function runGen() {
   });
 }
 async function busy(f) {
-  if (st.busy) return; st.busy = true; $$('.run').forEach(b => b.disabled = true);
-  try { await f(); } catch (e) { fail(e); } finally { st.busy = false; $$('.run').forEach(b => b.disabled = false); }
+  if (st.busy) return; st.busy = true; $$('.run').forEach(b => b.disabled = true); st.ac = new AbortController(); $('#btnCancel').hidden = false;
+  try { await f(); } catch (e) { if (st.ac.signal.aborted) status('Đã huỷ.'); else fail(e); } finally { st.busy = false; st.ac = null; $('#btnCancel').hidden = true; $$('.run').forEach(b => b.disabled = false); if (S.ortStarted()) $('#backend').textContent = S.backendLabel(); if (S.lowMem) S.releaseAll(); }
 }
 
 // ---------- khung kết quả ----------
@@ -177,7 +188,7 @@ async function save(c, name) {
 }
 
 // ---------- danh sách model ----------
-function optLabel(m, cached) { return `${m.label} · ${MB(m.bytes)}${cached ? ' ✓' : ''}`; }
+function optLabel(m, cached) { return `${m.label} · ${MB(S.sizeOf(m))}${cached ? ' ✓' : ''}`; }
 async function refreshModels() {
   const fill = async (sel, group, kind, extra) => {
     const el = $(sel); const keep = el.value; el.innerHTML = extra || '';
@@ -186,7 +197,7 @@ async function refreshModels() {
     el.append(og);
     const cu = S.customList().filter(x => x.profile?.kind === kind);
     if (cu.length) { const o2 = document.createElement('optgroup'); o2.label = 'Model của bạn'; for (const m of cu) o2.append(new Option(`${m.name} · ${MB(m.size)}`, 'custom:' + m.id)); el.append(o2); }
-    el.value = [...el.options].some(o => o.value === keep) ? keep : el.options[extra ? 1 : 0].value;
+    el.value = [...el.options].some(o => o.value === keep) ? keep : el.options[extra ? (S.lowMem && kind === 'restore' ? 0 : 1) : 0].value;
   };
   await fill('#selSwap', 'swap', 'swap'); await fill('#selRestore', 'restore', 'restore', '<option value="none">Không làm nét</option>');
   modelInfo(); renderModelPane();
@@ -211,7 +222,7 @@ async function renderModelPane() {
   const u = await S.usage(); $('#usage').textContent = u ? `Bộ nhớ đã dùng: ${MB(u.usage || 0)} / ${MB(u.quota || 0)} · Chạy bằng: ${S.backendLabel()}` : '';
   const rl = $('#regList'); rl.innerHTML = '';
   for (const b of BUNDLES()) {
-    let bytes = 0, ok = true; for (const [g, ids] of b.g) for (const id of ids) { bytes += REG[g][id].bytes; if (!(await S.isCached(g, [id]))) ok = false; }
+    let bytes = 0, ok = true; for (const [g, ids] of b.g) for (const id of ids) { bytes += S.sizeOf(REG[g][id]); if (!(await S.isCached(g, [id]))) ok = false; }
     const d = document.createElement('div'); d.className = 'mitem';
     d.innerHTML = `<b>${b.name}</b> · ${MB(bytes)} ${ok ? '<span class="ok">✓ đã lưu offline</span>' : ''}<div class="lic">Giấy phép: ${b.lic}</div><div class="act"></div>`;
     const act = d.querySelector('.act');
@@ -287,6 +298,8 @@ async function addFromUrl(url, jurl) {
 // ---------- khởi động ----------
 function chips(box, list, onClick) { const b = $(box); for (const t of list) { const c = document.createElement('button'); c.type = 'button'; c.className = 'chip'; c.textContent = t; c.onclick = () => onClick(t, c); b.append(c); } }
 function setTab(t) {
+  document.body.classList.toggle('at-home', t === 'home'); $('#home').hidden = t !== 'home';
+  if (t === 'home') { st.tab = t; $$('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); return; }
   st.tab = t; $$('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   $('#pane-swap').hidden = t !== 'swap'; $('#pane-gen').hidden = !(t === 't2i' || t === 'i2i'); $('#pane-models').hidden = t !== 'models';
   $('#slotInit').hidden = t !== 'i2i'; $('#strengthL').hidden = t !== 'i2i';
@@ -297,11 +310,12 @@ async function tierUI() {
   const tier = $('input[name=tier]:checked').value; const s = G.tierSupported(tier); const w = $('#tierWarn');
   w.hidden = !(s.why || s.warn); w.textContent = s.why || s.warn || ''; $('#stepsL').hidden = tier !== 'hq';
   const fb = await G.tierBytes('fast'), hb = await G.tierBytes('hq');
-  $('#tierFast').textContent = `SDXS-512 · 1 bước · ${MB(fb)} · chạy cả iPhone`; $('#tierHq').textContent = `SD-Turbo · 1–8 bước · ${MB(hb)} · cần WebGPU`;
+  const hqOk = !S.isIOS || (navigator.gpu && localStorage.getItem('studioai.gpu') === '1');
+  $('#tierHq').closest('label').hidden = !hqOk;   // iPhone: ẩn Chất lượng cao (2,6 GB, chắc chắn văng)
+  $('#tierFast').textContent = S.lowMem ? `SDXS-512 (int8) · 1 bước · tải ${MB(fb)} · dùng ~1,2 GB RAM` : `SDXS-512 · 1 bước · ${MB(fb)} · chạy cả iPhone`; $('#tierHq').textContent = `SD-Turbo · 1–8 bước · ${MB(hb)} · cần WebGPU`;
 }
 async function init() {
   const qs = new URLSearchParams(location.search); st.auto = qs.get('auto') === '1';
-  if (document.referrer && !/\/studio\//.test(document.referrer) && !qs.get('from')) $('#back').href = '../studio/';
   REG = await S.registry();
   $('#consentNote').textContent = CONSENT;
   chips('#swapChips', SWAP_CHIPS, (t) => { const a = $('#swapCmd'); a.value = (a.value.trim() ? a.value.trim().replace(/[,.]$/, '') + ', ' : '') + t.toLowerCase(); echoCmd(); });
@@ -342,9 +356,13 @@ async function init() {
   });
   $('#mUrlGo').onclick = wrap(() => addFromUrl($('#mUrl').value, $('#mUrlJson').value));
   await refreshModels(); tierUI();
-  S.getOrt().then(() => { $('#backend').textContent = S.backendLabel(); });
-  const tab = qs.get('tab'); if (tab) setTab(tab);
+  // không nạp ONNX Runtime khi mở trang — chỉ nạp khi bấm Chạy/Ghép (tiết kiệm RAM trên iPhone)
+  $('#backend').textContent = S.lowMem ? 'Tiết kiệm RAM · CPU 1 luồng' : 'AI nạp khi chạy';
+  $('#btnCancel').onclick = () => { st.ac?.abort(); S.cancelIsolated(); status('Đang huỷ…'); };
+  if (S.lowMem) { const sz = $('#size'); [...sz.options].forEach(o => { if (+o.value > 512) o.remove(); }); sz.value = '512'; $('#sizeNote').hidden = false; }
+  $$('.tile[data-go]').forEach(b => b.onclick = () => { setTab(b.dataset.go); history.replaceState(null, '', '?tab=' + b.dataset.go); });
+  const tab = qs.get('tab'); setTab(tab || 'home');
   const { install } = await import('./api.js');
-  install({ coreSwap, coreGen, finalOf, loadImage, show, addHist, status, setTab, st, addCustom, refreshModels, REG });
+  install({ coreSwap, coreGen, finalOf, loadImage: (x) => loadImage(x, S.lowMem ? 1080 : 0), show, addHist, status, setTab, st, addCustom, refreshModels, REG });
 }
 init().catch(fail);

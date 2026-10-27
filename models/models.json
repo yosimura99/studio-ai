@@ -10,7 +10,8 @@
    "size32": 16903680,
    "g16": 40293,
    "g32": 31632,
-   "bytes": 8486755
+   "bytes": 8486755,
+   "gc": true
   },
   "arcface": {
    "id": "arcface",
@@ -23,7 +24,8 @@
    "size32": 174363904,
    "g16": 36909,
    "g32": 37565,
-   "bytes": 87226258
+   "bytes": 87226258,
+   "gc": true
   },
   "bisenet": {
    "id": "bisenet",
@@ -35,7 +37,8 @@
    "size32": 93594112,
    "g16": 60239,
    "g32": 60482,
-   "bytes": 46860565
+   "bytes": 46860565,
+   "gc": true
   },
   "nsfw": {
    "id": "nsfw",
@@ -66,7 +69,18 @@
    "size32": 492241920,
    "g16": 190651,
    "g32": 191369,
-   "bytes": 246318920
+   "bytes": 246318920,
+   "gc": true,
+   "q": {
+    "chunks": [
+     "q.000",
+     "q.001",
+     "q.002"
+    ],
+    "size": 123181824,
+    "bytes": 124091611,
+    "root": "studio-ai-m4/t2iq/text_encoder/"
+   }
   },
   "unet": {
    "id": "unet",
@@ -91,7 +105,22 @@
    "size32": 1262984960,
    "g16": 488170,
    "g32": 492712,
-   "bytes": 631994629
+   "bytes": 631994629,
+   "gc": true,
+   "q": {
+    "chunks": [
+     "q.000",
+     "q.001",
+     "q.002",
+     "q.003",
+     "q.004",
+     "q.005",
+     "q.006"
+    ],
+    "size": 315934080,
+    "bytes": 317240040,
+    "root": "studio-ai-m4/t2iq/unet/"
+   }
   },
   "vae_decoder": {
    "id": "vae_decoder",
@@ -103,7 +132,8 @@
    "size32": 4890112,
    "g16": 35707,
    "g32": 35925,
-   "bytes": 2482882
+   "bytes": 2482882,
+   "gc": true
   },
   "vae_encoder": {
    "id": "vae_encoder",
@@ -115,7 +145,8 @@
    "size32": 4890112,
    "g16": 30965,
    "g32": 31158,
-   "bytes": 2478116
+   "bytes": 2478116,
+   "gc": true
   }
  },
  "hq": {
@@ -250,7 +281,8 @@
     "label": "inswapper 128 (mặc định)",
     "kind": "swap"
    },
-   "note": "Cân bằng nhất, nhanh; độ phân giải mặt 128 px (có làm nét sau)."
+   "note": "Cân bằng nhất, nhanh; độ phân giải mặt 128 px (có làm nét sau).",
+   "gc": true
   },
   "hyperswap_1a_256": {
    "id": "hyperswap_1a_256",
@@ -672,7 +704,8 @@
     "template": "ffhq_512",
     "label": "GFPGAN 1.4 (mặc định)"
    },
-   "note": "Làm nét mặt nhanh, tự nhiên."
+   "note": "Làm nét mặt nhanh, tự nhiên.",
+   "gc": true
   },
   "codeformer": {
    "id": "codeformer",

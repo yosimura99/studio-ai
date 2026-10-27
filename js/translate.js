@@ -30,6 +30,7 @@ export async function mtReady() { return S.isCached('mt', ['encoder', 'decoder']
 /** Dịch; trả {text, how:'opus'|'dict'|'none'} */
 export async function translate(text, onP) {
   if (!hasVietnamese(text)) return { text, how: 'none' };
+  if (S.isolate()) { try { return await S.inWorker({ kind: 'translate', text }); } catch (e) { console.warn('dịch trong worker lỗi', e); } }
   let pre = text; for (const [k, v] of KEEP) pre = pre.replace(new RegExp(k, 'gi'), v);
   try {
     await vocab(); const ort = await S.getOrt();
@@ -50,4 +51,5 @@ export async function translate(text, onP) {
     }
     return { text: outs.join(' ').replace(/\s+/g, ' ').trim(), how: 'opus' };
   } catch (e) { console.warn('opus-mt lỗi, dùng từ điển', e); return { text: dictFallback(pre), how: 'dict' }; }
+  finally { if (S.lowMem) { await S.release('mt', 'encoder'); await S.release('mt', 'decoder'); } }
 }

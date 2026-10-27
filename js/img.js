@@ -1,7 +1,7 @@
 // Tiện ích ảnh: nạp ảnh, ma trận tương tự (Umeyama), warp bằng canvas, làm mờ, tensor.
 export function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 export const ctx2d = (c) => c.getContext('2d', { willReadFrequently: true });
-export async function loadImage(src) {
+export async function loadImage(src, maxSide = 0) {
   if (src instanceof HTMLCanvasElement) return src;
   let blob = src;
   if (typeof src === 'string') { const r = await fetch(src); if (!r.ok) throw new Error('Không tải được ảnh'); blob = await r.blob(); }
@@ -9,7 +9,8 @@ export async function loadImage(src) {
   try { bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' }); }
   catch { const u = URL.createObjectURL(blob); const im = new Image(); im.src = u; await im.decode(); bmp = im; }
   const w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight;
-  const c = canvas(w, h); ctx2d(c).drawImage(bmp, 0, 0); bmp.close?.(); return c;
+  const k = maxSide && Math.max(w, h) > maxSide ? maxSide / Math.max(w, h) : 1;   // iPhone: giới hạn cạnh dài để đỡ RAM
+  const c = canvas(Math.round(w * k), Math.round(h * k)); const g = ctx2d(c); g.imageSmoothingQuality = 'high'; g.drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.(); return c;
 }
 // least-squares similarity transform src->dst; returns [a,b,tx,c,d,ty] (2x3 row-major)
 export function similarity(src, dst) {

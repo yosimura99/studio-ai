@@ -4,7 +4,7 @@
 
 - Mở app: https://yosimura99.github.io/studio-ai/
 - Hướng dẫn (tiếng Việt): https://yosimura99.github.io/studio-ai/docs.html
-- Là một phần của **Studio Của Khang** (https://yosimura99.github.io/studio/), dùng chung mã PIN (`js/lock.js`, `data-ns="studio"`).
+- App riêng (cài lên màn hình chính được), đi kèm **Pỏn của Khang** (https://yosimura99.github.io/studio/), dùng chung mã PIN (`js/lock.js`, `data-ns="studio"`).
 
 ## Tính năng
 - **Ghép mặt AI**: SCRFD (tìm mặt) → ArcFace → model ghép (inswapper / HyperSwap / SimSwap / GHOST / UniFace) → làm nét (GFPGAN / CodeFormer / GPEN / RestoreFormer++) → BiSeNet khoá vùng mặt + cọ vẽ mặt nạ. Ảnh xuất đủ độ phân giải, điểm ảnh ngoài mặt nạ giữ nguyên 100%.

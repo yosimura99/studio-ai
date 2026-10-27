@@ -231,7 +231,7 @@ const clamp255 = v => v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
  * Trả về job (giữ ảnh trung gian để vẽ lại mặt nạ không cần chạy lại model).
  */
 export async function swap(srcImg, srcFace, dstImg, dstFace, opts = {}) {
-  const o = { swapper: { src: 'reg', id: 'inswapper_128' }, restorer: { src: 'reg', id: 'gfpgan_1.4' }, restoreAmt: 0.8, colorMatch: true, lock: true, keepMouth: false, ...opts };
+  const o = { swapper: { src: 'reg', id: 'inswapper_128' }, restorer: S.lowMem ? null : { src: 'reg', id: 'gfpgan_1.4' }, restoreAmt: 0.8, colorMatch: true, lock: true, keepMouth: false, ...opts };
   if (o.restore === false) o.restorer = null;
   const step = (m, p) => o.onStep?.(m, p); const T0 = performance.now(); const times = {};
   const t = async (name, f) => { const a = performance.now(); const r = await f(); times[name] = Math.round(performance.now() - a); await tick(); return r; };
