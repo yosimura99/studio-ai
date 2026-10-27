@@ -1,6 +1,6 @@
 // Service worker Studio AI: thêm header COOP/COEP (để WASM chạy đa luồng), lưu giao diện offline.
 // KHÔNG lưu sẵn model lúc cài — model được tải khi người dùng cần và nằm trong Cache Storage riêng.
-const VERSION = 'studio-ai-shell-v3';
+const VERSION = 'studio-ai-shell-v4';
 const SHELL = ['./', 'index.html', 'docs.html', 'css/app.css', 'js/app.js', 'js/api.js', 'js/store.js', 'js/face.js', 'js/img.js', 'js/t2i.js', 'js/clip_tok.js', 'js/translate.js',
   'js/safety.js', 'js/cmd.js', 'js/onnxscan.js', 'js/lock.js', 'models/models.json', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

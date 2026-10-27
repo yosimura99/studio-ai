@@ -21,7 +21,7 @@
 
   /* ---------- CSS (tự chứa, dùng biến màu của app nếu có) ---------- */
   const css = `
-html.sl-locked body>*:not(.sl-root){visibility:hidden!important}
+html.sl-locked body>*:not(.sl-root):not(.sl-confirm){visibility:hidden!important}
 html.sl-locked,html.sl-locked body{overflow:hidden!important}
 .sl-root{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;
  background:radial-gradient(120% 80% at 10% 0%,#1d2533 0%,var(--bg,#0e0e10) 60%),var(--bg,#0e0e10);color:var(--tx,#ececef);
@@ -106,8 +106,14 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
     return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, key, 256));
   }
   const eq = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i]; return d === 0; };
-  const getData = () => { const d = lsGet(K.data); return d && d.hash && d.salt ? d : null; };
+  function validRec(d) {
+    try { return !!(d && typeof d.salt === 'string' && typeof d.hash === 'string' && unb64(d.salt).length >= 8 && unb64(d.hash).length === 32 && (!d.len || (d.len >= MINLEN && d.len <= MAXLEN))); } catch (e) { return false; }
+  }
+  const getData = () => { const d = lsGet(K.data); return validRec(d) ? d : null; };
+  // bản ghi hỏng (không đọc được muối/mã băm) → xóa dữ liệu khóa để tạo mã mới, không đụng dữ liệu khác
+  try { const raw = localStorage.getItem(K.data); if (raw && !getData()) { [K.data, K.fail, K.hidden].forEach(k => localStorage.removeItem(k)); } } catch (e) { }
   async function savePin(pin, keep) {
+    pin = String(pin).replace(/\D/g, '');
     const salt = rnd(16), hash = await derive(pin, salt, ITER);
     const old = keep ? getData() : null;
     const d = { v: 1, alg: 'PBKDF2-SHA256', iter: ITER, salt: b64(salt), hash: b64(hash), len: pin.length, created: Date.now() };
@@ -117,6 +123,7 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
   }
   async function checkPin(pin) {
     const d = getData(); if (!d) return false;
+    pin = String(pin).replace(/\D/g, '');
     return eq(await derive(pin, unb64(d.salt), d.iter || ITER), unb64(d.hash));
   }
   /* sai quá 5 lần → chờ tăng dần: 30 giây, 1, 2, 4, 8… phút (tối đa 1 giờ) */
@@ -126,7 +133,7 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
     if (f.n >= FREE_TRIES) f.until = Date.now() + Math.min(3600, 30 * Math.pow(2, f.n - FREE_TRIES)) * 1000;
     lsSet(K.fail, f); return f;
   }
-  const waitLeft = () => Math.max(0, failState().until - Date.now());
+  const waitLeft = () => Math.min(3600 * 1000, Math.max(0, (+failState().until || 0) - Date.now()));
   const fmtWait = ms => { const s = Math.ceil(ms / 1000); return s >= 60 ? Math.floor(s / 60) + ' phút ' + String(s % 60).padStart(2, '0') + ' giây' : s + ' giây'; };
 
   /* ---------- Face ID / Touch ID (WebAuthn, chỉ để mở nhanh – PIN vẫn là dự phòng) ---------- */
@@ -189,29 +196,45 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
 
   /* mode: 'unlock' | 'setup' | 'change' (nhập PIN cũ → mới → xác nhận) */
   function pinScreen(mode, opts = {}) {
-    if (ui) ui.remove();
+    if (ui && ui._close) ui._close(); else if (ui) ui.remove();
     let step = mode === 'unlock' ? 'unlock' : mode === 'change' ? 'old' : 'new';
     let buf = '', first = '', busy = false, timer = 0;
     const d0 = getData();
     const fixedLen = () => step === 'unlock' || step === 'old' ? (getData() || {}).len || 0 : step === 'confirm' ? first.length : 0;
     const logo = ICON ? el('img', { class: 'sl-logo', src: ICON, alt: '' }) : null;
     const tEl = el('div', { class: 'sl-title' }), mEl = el('div', { class: 'sl-msg', role: 'status', 'aria-live': 'polite' }), dots = el('div', { class: 'sl-dots', 'aria-hidden': 'true' });
-    const okKey = el('button', { class: 'sl-key fn', type: 'button', 'aria-label': 'Tiếp', onclick: () => submit() }, 'Tiếp');
-    const delKey = el('button', { class: 'sl-key fn', type: 'button', 'aria-label': 'Xóa', html: ICO.del, onclick: () => back() });
+    const okKey = el('button', { class: 'sl-key fn', type: 'button', 'aria-label': 'Tiếp', 'data-act': 'ok' }, 'Tiếp');
+    const delKey = el('button', { class: 'sl-key fn', type: 'button', 'aria-label': 'Xóa', 'data-act': 'del', html: ICO.del });
     const L = ['', 'ABC', 'DEF', 'GHI', 'JKL', 'MNO', 'PQRS', 'TUV', 'WXYZ'];
     const keys = [];
     const pad = el('div', { class: 'sl-pad' });
     for (let i = 1; i <= 9; i++) { const k = el('button', { class: 'sl-key', type: 'button', 'data-d': i, 'aria-label': String(i) }, String(i), L[i - 1] ? el('small', null, L[i - 1]) : el('small', null, '\u00a0')); keys.push(k); pad.append(k); }
     const zero = el('button', { class: 'sl-key', type: 'button', 'data-d': 0, 'aria-label': '0' }, '0', el('small', null, '\u00a0')); keys.push(zero);
     pad.append(okKey, zero, delKey);
-    pad.addEventListener('click', e => { const k = e.target.closest('[data-d]'); if (k) press(k.dataset.d); });
+    /* Mỗi lần chạm = đúng một phím: nhận ở pointerdown/touchstart (như bàn phím iOS), chặn click giả lập
+       và chạm-đúp-phóng-to của Safari để số lặp (vd. 4566) không bị mất hay bị nhân đôi. */
+    let lastTouch = 0;
+    const act = k => { if (!k || k.disabled) return; k.classList.add('pr'); setTimeout(() => k.classList.remove('pr'), 130); if (k.dataset.d != null) press(k.dataset.d); else if (k.dataset.act === 'ok') submit(); else if (k.dataset.act === 'del') back(); };
+    const keyOf = e => e.target && e.target.closest && e.target.closest('.sl-key');
+    if (window.PointerEvent) pad.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; if (e.pointerType !== 'mouse') lastTouch = Date.now(); const k = keyOf(e); if (k) { e.preventDefault(); act(k); } });
+    else pad.addEventListener('touchstart', e => { lastTouch = Date.now(); const k = keyOf(e); if (k) { e.preventDefault(); act(k); } }, { passive: false });
+    pad.addEventListener('touchstart', e => { if (keyOf(e) && e.cancelable) e.preventDefault(); }, { passive: false }); // không có click giả, không phóng to
+    pad.addEventListener('touchend', e => { if (keyOf(e) && e.cancelable) e.preventDefault(); }, { passive: false });
+    pad.addEventListener('dblclick', e => e.preventDefault());
+    pad.addEventListener('click', e => { // chỉ cho bàn phím/trình đọc màn hình (Enter/Space trên nút) – chuột và chạm đã xử lý ở trên
+      const k = keyOf(e); if (!k) return; e.preventDefault();
+      if (e.detail === 0 && Date.now() - lastTouch > 800) act(k);
+      else if (!window.PointerEvent && e.detail > 0 && Date.now() - lastTouch > 800) act(k); // trình duyệt rất cũ, chuột
+    });
     const row = el('div', { class: 'sl-row' });
     const bioBtn = el('button', { class: 'sl-btn', type: 'button', hidden: true, html: '<span style="display:inline-flex;align-items:center;gap:6px">' + ICO.face.replace('<svg', '<svg width="20" height="20"') + 'Face ID / Touch ID</span>', onclick: () => tryBio(true) });
     const cancelBtn = el('button', { class: 'sl-link', type: 'button', hidden: !opts.cancelable, onclick: () => close(false) }, 'Hủy');
-    row.append(bioBtn, cancelBtn);
+    const forgotBtn = el('button', { class: 'sl-link', type: 'button', hidden: true, onclick: () => forgot() }, 'Quên PIN / Đặt lại');
+    row.append(bioBtn, forgotBtn, cancelBtn);
     const hint = el('div', { class: 'sl-hint' });
     const box = el('div', { class: 'sl-box' }, logo, el('div', { class: 'sl-app' }, TITLE), tEl, mEl, dots, pad, row, hint);
-    ui = el('div', { class: 'sl-root', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Khóa ứng dụng' }, box);
+    const me = ui = el('div', { class: 'sl-root', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Khóa ứng dụng' }, box);
+    me._close = () => close(null);
     (document.body || root).appendChild(ui);
 
     function render(msg, err) {
@@ -222,11 +245,12 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
       const def = step === 'new' ? 'Chọn 4–6 chữ số rồi bấm “Tiếp”.' : step === 'confirm' ? 'Nhập lại đúng mã vừa tạo.' : '';
       mEl.textContent = msg != null ? msg : def; mEl.classList.toggle('err', !!err);
       okKey.style.visibility = n ? 'hidden' : 'visible'; okKey.disabled = buf.length < MINLEN || busy;
+      forgotBtn.hidden = !(step === 'unlock' || step === 'old');
       delKey.style.visibility = buf.length ? 'visible' : 'hidden';
       const w = (step === 'unlock' || step === 'old') ? waitLeft() : 0;
       keys.forEach(k => (k.disabled = busy || w > 0));
       bioBtn.hidden = !(step === 'unlock' && bioOn());
-      hint.textContent = step === 'unlock' ? (bioOn() ? 'Quên mã PIN? Mở bằng Face ID / Touch ID rồi vào ⚙︎ → “Quên PIN”.' : 'Quên mã PIN? Chỉ còn cách xóa dữ liệu trang web của ứng dụng (công thức tự tạo sẽ mất).') : step === 'new' && mode === 'setup' ? 'Mã PIN chỉ lưu dạng đã băm trên máy này. Lần sau mở ứng dụng sẽ cần nhập mã.' : '';
+      hint.textContent = step === 'unlock' ? 'Quên mã PIN? Bấm “Quên PIN / Đặt lại”: chỉ xóa mã PIN trên máy này, ảnh, công thức và mô hình vẫn giữ nguyên.' : step === 'new' && mode === 'setup' ? 'Mã PIN chỉ lưu dạng đã băm trên máy này. Lần sau mở ứng dụng sẽ cần nhập mã.' : '';
       if (w > 0) { mEl.textContent = 'Sai quá nhiều lần. Thử lại sau ' + fmtWait(w) + '.'; mEl.classList.add('err'); clearTimeout(timer); timer = setTimeout(() => render(), 1000); }
     }
     function shake() { dots.classList.remove('sl-shake'); void dots.offsetWidth; dots.classList.add('sl-shake'); }
@@ -243,6 +267,9 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
       if (step === 'new') { first = pin; buf = ''; step = 'confirm'; render(); return; }
       if (step === 'confirm') {
         if (pin !== first) { buf = ''; first = ''; step = 'new'; shake(); render('Hai lần nhập không khớp. Hãy tạo lại.', true); return; }
+        if (mode === 'setup' && getData()) { // trang/tab khác (vd. Studio AI) vừa tạo mã → không ghi đè
+          buf = ''; first = ''; step = 'unlock'; mode = 'unlock'; shake(); render('Ứng dụng đã có mã PIN (vừa tạo ở trang khác). Hãy nhập mã đó.', true); return;
+        }
         busy = true; render('Đang lưu…');
         try { await savePin(pin, mode === 'change'); } catch (e) { busy = false; buf = ''; render(e.message || 'Không lưu được mã PIN', true); return; }
         busy = false;
@@ -258,6 +285,21 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
       const left = FREE_TRIES - f.n;
       render(left > 0 ? 'Sai mã PIN. Còn ' + left + ' lần thử trước khi phải chờ.' : 'Sai mã PIN.', true);
     }
+    function forgot() {
+      const w = el('div', { class: 'sl-confirm' });
+      const okB = el('button', { class: 'sl-btn danger', type: 'button', disabled: true }, 'Đặt lại (30)');
+      let left = 30; const tick = setInterval(() => { left--; if (left > 0) okB.textContent = 'Đặt lại (' + left + ')'; else { clearInterval(tick); okB.textContent = 'Đặt lại'; okB.disabled = false; } }, 1000);
+      const done = () => { clearInterval(tick); w.remove(); };
+      okB.onclick = () => {
+        done(); resetLock();
+        if (mode === 'change') { close(false); locked = true; root.classList.add('sl-locked'); pinScreen('setup', { done: ok2 => { if (ok2) { unlocked(); toast('Đã đặt mã PIN mới'); } } }); return; }
+        step = 'new'; mode = 'setup'; buf = ''; first = ''; render('Đã xóa mã PIN cũ. Hãy tạo mã PIN mới.');
+      };
+      w.append(el('div', { class: 'sl-cbox' }, el('h3', null, 'Quên mã PIN?'),
+        el('p', null, 'Mã PIN (và Face ID / Touch ID) của ứng dụng trên máy này sẽ bị xóa, rồi bạn tạo mã PIN mới. Ảnh, công thức tự tạo, preset và mô hình đã tải vẫn giữ nguyên. Để tránh bấm nhầm, nút sẽ mở sau 30 giây.'),
+        el('div', { class: 'acts' }, el('button', { class: 'sl-btn', type: 'button', onclick: done }, 'Hủy'), okB)));
+      document.body.append(w);
+    }
     function offerBio() {
       tEl.textContent = 'Mở nhanh bằng Face ID / Touch ID?'; mEl.classList.remove('err');
       mEl.textContent = 'Chỉ để tiện mở nhanh. Mã PIN vẫn luôn dùng được.';
@@ -272,16 +314,26 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
       catch (e) { busy = false; render(manual ? 'Không xác minh được. Hãy nhập mã PIN.' : null, !!manual); }
     }
     function onKey(e) {
-      if (!ui || !ui.isConnected) return;
+      if (!me.isConnected || ui !== me) return;
       if (/^[0-9]$/.test(e.key)) { e.preventDefault(); press(e.key); }
       else if (e.key === 'Backspace') { e.preventDefault(); back(); }
       else if (e.key === 'Enter') { e.preventDefault(); submit(); }
       else if (e.key === 'Escape' && opts.cancelable) close(false);
     }
     document.addEventListener('keydown', onKey, true);
+    function onStorage(e) { // tab/trang khác đổi dữ liệu khóa
+      if (e.key !== K.data && e.key !== null) return;
+      if (busy) return;
+      const has = !!getData();
+      if ((step === 'unlock' || step === 'old') && !has) { step = 'new'; mode = 'setup'; buf = ''; render('Mã PIN đã được đặt lại ở trang khác. Hãy tạo mã PIN mới.'); }
+      else if (step === 'new' || step === 'confirm') { if (has && mode === 'setup') { step = 'unlock'; mode = 'unlock'; buf = ''; first = ''; render('Ứng dụng đã có mã PIN (vừa tạo ở trang khác). Hãy nhập mã đó.'); } }
+      else render();
+    }
+    window.addEventListener('storage', onStorage);
     function close(ok, toastMsg) {
-      clearTimeout(timer); document.removeEventListener('keydown', onKey, true);
-      if (ui) { ui.remove(); ui = null; }
+      clearTimeout(timer); document.removeEventListener('keydown', onKey, true); window.removeEventListener('storage', onStorage);
+      me.remove(); if (ui === me) ui = null;
+      if (ok === null) return;
       if (opts.done) opts.done(ok);
       if (toastMsg) toast(toastMsg);
     }
@@ -326,12 +378,25 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
       // chuyển trang trong cùng tab (vd. Studio ↔ Studio AI) trong vòng 60 giây → không hỏi lại mã PIN
       let t = 0; try { t = +sessionStorage.getItem(K.pass) || 0; sessionStorage.removeItem(K.pass); } catch (e) { }
       if (t && Date.now() - t >= 0 && Date.now() - t < 60000) return unlocked();
+      // (thẻ chỉ được tạo khi bấm liên kết/chuyển trang giữa các trang của ứng dụng, không khi tải lại hay đóng)
       lock();
     }
     else pinScreen('setup', { done: ok => { if (ok) unlocked(); } });
   }
 
-  window.addEventListener('pagehide', () => { if (!locked) try { sessionStorage.setItem(K.pass, String(Date.now())); } catch (e) { } });
+  /* Thẻ "đã mở khóa" 60 giây cho lần chuyển trang kế tiếp trong cùng tab – chỉ khi chính ứng dụng điều hướng
+     (StudioLock.go / StudioLock.reload / bấm liên kết cùng nguồn), không áp dụng khi người dùng tải lại hay mở lại. */
+  const givePass = () => { if (!locked) try { sessionStorage.setItem(K.pass, String(Date.now())); } catch (e) { } };
+  function go(url) { givePass(); location.href = url; }
+  function reload() { // đang ở màn hình mã PIN → chờ mở khóa xong mới tải lại (không làm mất số đang nhập)
+    if (locked) { let done = false; unlockFns.push(() => { if (!done) { done = true; givePass(); location.reload(); } }); return; }
+    givePass(); location.reload();
+  }
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a || e.defaultPrevented || a.hasAttribute('download') || (a.target && a.target !== '_self') || e.metaKey || e.ctrlKey) return;
+    try { const u = new URL(a.href, location.href); if (u.origin === location.origin) givePass(); } catch (er) { }
+  });
   /* ---------- tự khóa khi ở nền > 5 phút ---------- */
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { if (!locked) lsSet(K.hidden, Date.now()); }
@@ -374,7 +439,7 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
     build();
     document.body.append(setEl);
   }
-  function resetLock() { [K.data, K.fail, K.hidden].forEach(lsDel); }
+  function resetLock() { [K.data, K.fail, K.hidden].forEach(lsDel); try { sessionStorage.removeItem(K.pass); } catch (e) { } }
 
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-lock-now],[data-lock-settings]');
@@ -383,6 +448,6 @@ html.sl-locked,html.sl-locked body{overflow:hidden!important}
     if (t.hasAttribute('data-lock-now')) lock(); else openSettings();
   });
 
-  window.StudioLock = { ready, lock, openSettings, resetLock, isLocked: () => locked, onUnlock: f => { unlockFns.push(f); if (!locked) f(); }, ns: NS };
+  window.StudioLock = { ready, lock, openSettings, resetLock, go, reload, version: 2, isLocked: () => locked, onUnlock: f => { unlockFns.push(f); if (!locked) f(); }, ns: NS };
   if (document.body) start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
 })();

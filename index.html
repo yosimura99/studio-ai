@@ -144,7 +144,7 @@
 <script>
 // Bật cô lập cross-origin (WASM đa luồng) qua service worker, rồi nạp app.
 if ('serviceWorker' in navigator && !self.crossOriginIsolated && !sessionStorage.coiTried) {
-  navigator.serviceWorker.register('sw.js').then(r => { if (!navigator.serviceWorker.controller || !self.crossOriginIsolated) { sessionStorage.coiTried = 1; navigator.serviceWorker.ready.then(() => location.reload()); } });
+  navigator.serviceWorker.register('sw.js').then(r => { if (!navigator.serviceWorker.controller || !self.crossOriginIsolated) { sessionStorage.coiTried = 1; navigator.serviceWorker.ready.then(() => (window.StudioLock && StudioLock.reload ? StudioLock.reload() : location.reload())); } });
 } else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
 <script type="module" src="js/app.js"></script>
